@@ -5,6 +5,7 @@ data/auth.json
 data/port-forwards.json
 data/challenges.json
 data/apps.json
+.webui_secret_key
 bun.lockb
 *.tsbuildinfo
 next-env.d.ts
