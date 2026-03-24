@@ -53,7 +53,7 @@ const DEFAULT_APPS: AppConfig[] = [
     name: "Ollama Web UI",
     icon: "Bot",
     description: "Chat with local LLMs via Ollama",
-    command: "C:\\Users\\pc\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m open_webui serve --port {port}",
+    command: "C:\\Users\\pc\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\open-webui.exe serve --port {port}",
     port: 3080,
     subdomain: "ai",
     authType: "none",
