@@ -4,7 +4,7 @@
             <protocol>rdp</protocol>
             <param name="hostname">host.docker.internal</param>
             <param name="port">3389</param>
-            <param name="username">YOUR_USERNAME</param>
+            <param name="username">YOUR_WINDOWS_USERNAME</param>
             <param name="password">YOUR_WINDOWS_PASSWORD</param>
             <param name="security">nla</param>
             <param name="ignore-cert">true</param>

@@ -6,6 +6,7 @@ data/port-forwards.json
 data/challenges.json
 data/apps.json
 .webui_secret_key
+guacamole-config/user-mapping.xml
 bun.lockb
 *.tsbuildinfo
 next-env.d.ts

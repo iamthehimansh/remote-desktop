@@ -31,9 +31,12 @@ if ($autoLogin -eq "1") {
     Write-Host "Auto-login is ON for user: $defaultUser" -ForegroundColor Green
 } else {
     Write-Host "Auto-login is NOT configured. Setting it up..." -ForegroundColor Yellow
+    $user = Read-Host "Enter Windows username"
+    $pass = Read-Host "Enter Windows password" -AsSecureString
+    $plainPass = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($pass))
     Set-ItemProperty -Path $autoLoginPath -Name "AutoAdminLogon" -Value "1"
-    Set-ItemProperty -Path $autoLoginPath -Name "DefaultUserName" -Value "pc"
-    Set-ItemProperty -Path $autoLoginPath -Name "DefaultPassword" -Value "$PLACEHOLDER"
+    Set-ItemProperty -Path $autoLoginPath -Name "DefaultUserName" -Value $user
+    Set-ItemProperty -Path $autoLoginPath -Name "DefaultPassword" -Value $plainPass
     Write-Host "Auto-login configured for user: pc" -ForegroundColor Green
     Write-Host "NOTE: Password is stored in registry in plain text. This is how Windows auto-login works." -ForegroundColor Yellow
 }
