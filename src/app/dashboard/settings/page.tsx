@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Fingerprint, Smartphone, Trash2, Plus } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Fingerprint, Smartphone, Trash2, Plus, Key, Monitor, Clock } from "lucide-react";
 import { startRegistration } from "@simplewebauthn/browser";
 import { useToast } from "@/hooks/use-toast";
 
@@ -13,6 +14,7 @@ interface PasskeyInfo {
   id: string;
   name: string;
   createdAt: string;
+  transports?: string[];
 }
 
 export default function SettingsPage() {
@@ -23,27 +25,30 @@ export default function SettingsPage() {
   const [totpCode, setTotpCode] = useState("");
   const [passkeyName, setPasskeyName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/me");
-      if (res.ok) {
-        const data = await res.json();
+      const [meRes, pkRes] = await Promise.all([
+        fetch("/api/auth/me"),
+        fetch("/api/auth/passkey/list"),
+      ]);
+
+      if (meRes.ok) {
+        const data = await meRes.json();
         setTotpEnabled(data.methods.totp);
       }
-      // Fetch passkeys list from auth store via a simple endpoint
-      const pkRes = await fetch("/api/auth/passkey/register-options");
+
       if (pkRes.ok) {
-        const opts = await pkRes.json();
-        // We can infer existing passkeys from excludeCredentials
-        // but better to add a dedicated list endpoint later
+        const data = await pkRes.json();
+        setPasskeys(data.passkeys);
       }
     } catch {}
-  };
+  }, []);
 
   useEffect(() => {
     fetchStatus();
-  }, []);
+  }, [fetchStatus]);
 
   const registerPasskey = async () => {
     setLoading(true);
@@ -75,6 +80,29 @@ export default function SettingsPage() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const deletePasskey = async (id: string) => {
+    setDeletingId(id);
+    try {
+      const res = await fetch("/api/auth/passkey/delete", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+
+      if (res.ok) {
+        toast({ title: "Passkey removed" });
+        fetchStatus();
+      } else {
+        const data = await res.json();
+        toast({ title: "Error", description: data.error, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to remove passkey", variant: "destructive" });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -128,6 +156,13 @@ export default function SettingsPage() {
     } catch {}
   };
 
+  const getTransportIcon = (transports?: string[]) => {
+    if (transports?.includes("internal")) return <Fingerprint className="h-4 w-4 text-accent" />;
+    if (transports?.includes("usb")) return <Key className="h-4 w-4 text-warning" />;
+    if (transports?.includes("hybrid")) return <Monitor className="h-4 w-4 text-success" />;
+    return <Key className="h-4 w-4 text-text-secondary" />;
+  };
+
   return (
     <div className="max-w-2xl space-y-6">
       <h1 className="text-2xl font-semibold text-text-primary">Settings</h1>
@@ -138,15 +173,64 @@ export default function SettingsPage() {
           <CardTitle className="flex items-center gap-2 text-text-primary">
             <Fingerprint className="h-5 w-5" />
             Passkeys
+            {passkeys.length > 0 && (
+              <Badge variant="secondary" className="bg-accent/10 text-accent ml-2">
+                {passkeys.length}
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Registered passkeys list */}
+          {passkeys.length > 0 && (
+            <div className="space-y-2">
+              {passkeys.map((pk) => (
+                <div
+                  key={pk.id}
+                  className="flex items-center justify-between p-3 bg-elevated rounded-lg"
+                >
+                  <div className="flex items-center gap-3">
+                    {getTransportIcon(pk.transports)}
+                    <div>
+                      <p className="text-sm text-text-primary font-medium">{pk.name}</p>
+                      <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+                        <Clock className="h-3 w-3" />
+                        {new Date(pk.createdAt).toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                        {pk.transports && (
+                          <span className="ml-1.5 text-text-secondary/60">
+                            {pk.transports.join(", ")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => deletePasskey(pk.id)}
+                    disabled={deletingId === pk.id}
+                    className="text-danger hover:text-danger/80 hover:bg-danger/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {passkeys.length > 0 && <Separator className="bg-border" />}
+
+          {/* Register new passkey */}
           <p className="text-sm text-text-secondary">
             Register a passkey for passwordless sign-in using biometrics or a security key.
           </p>
           <div className="flex gap-2">
             <Input
-              placeholder="Passkey name (optional)"
+              placeholder="Passkey name (e.g. MacBook, iPhone)"
               value={passkeyName}
               onChange={(e) => setPasskeyName(e.target.value)}
               className="bg-elevated border-border text-text-primary"

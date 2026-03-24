@@ -2,13 +2,10 @@ import { NextResponse } from "next/server";
 import { verifyRegistrationResponse } from "@simplewebauthn/server";
 import { addPasskey } from "@/lib/auth-store";
 import { getRegistrationChallenge, deleteRegistrationChallenge } from "@/lib/challenge-store";
-
-const RP_ID = process.env.NODE_ENV === "production" ? "pc.himansh.in" : "localhost";
-const ORIGIN = process.env.NODE_ENV === "production"
-  ? "https://pc.himansh.in"
-  : "http://localhost:3005";
+import { getWebAuthnConfig } from "@/lib/webauthn";
 
 export async function POST(request: Request) {
+  const { rpID, origin } = getWebAuthnConfig(request);
   const body = await request.json();
   const expectedChallenge = getRegistrationChallenge("admin");
 
@@ -23,8 +20,8 @@ export async function POST(request: Request) {
     const verification = await verifyRegistrationResponse({
       response: body.credential,
       expectedChallenge,
-      expectedOrigin: ORIGIN,
-      expectedRPID: RP_ID,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
     });
 
     if (!verification.verified || !verification.registrationInfo) {

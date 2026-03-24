@@ -2,16 +2,15 @@ import { NextResponse } from "next/server";
 import { generateRegistrationOptions } from "@simplewebauthn/server";
 import { getPasskeys } from "@/lib/auth-store";
 import { setRegistrationChallenge } from "@/lib/challenge-store";
+import { getWebAuthnConfig } from "@/lib/webauthn";
 
-const RP_NAME = "PC Dashboard";
-const RP_ID = process.env.NODE_ENV === "production" ? "pc.himansh.in" : "localhost";
-
-export async function GET() {
+export async function GET(request: Request) {
+  const { rpID, rpName } = getWebAuthnConfig(request);
   const existingPasskeys = getPasskeys();
 
   const options = await generateRegistrationOptions({
-    rpName: RP_NAME,
-    rpID: RP_ID,
+    rpName,
+    rpID,
     userName: "admin",
     userDisplayName: "Admin",
     attestationType: "none",

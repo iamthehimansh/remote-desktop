@@ -3,13 +3,10 @@ import { verifyAuthenticationResponse } from "@simplewebauthn/server";
 import { getPasskeys, updatePasskeyCounter } from "@/lib/auth-store";
 import { signToken, createSessionCookie } from "@/lib/auth";
 import { getAuthenticationChallenge, deleteAuthenticationChallenge } from "@/lib/challenge-store";
-
-const RP_ID = process.env.NODE_ENV === "production" ? "pc.himansh.in" : "localhost";
-const ORIGIN = process.env.NODE_ENV === "production"
-  ? "https://pc.himansh.in"
-  : "http://localhost:3005";
+import { getWebAuthnConfig } from "@/lib/webauthn";
 
 export async function POST(request: Request) {
+  const { rpID, origin } = getWebAuthnConfig(request);
   const body = await request.json();
   const expectedChallenge = getAuthenticationChallenge("admin");
 
@@ -34,8 +31,8 @@ export async function POST(request: Request) {
     const verification = await verifyAuthenticationResponse({
       response: body,
       expectedChallenge,
-      expectedOrigin: ORIGIN,
-      expectedRPID: RP_ID,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
       credential: {
         id: passkey.id,
         publicKey: Buffer.from(passkey.publicKey, "base64url"),

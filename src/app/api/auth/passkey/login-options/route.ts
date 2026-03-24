@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { generateAuthenticationOptions } from "@simplewebauthn/server";
 import { getPasskeys } from "@/lib/auth-store";
 import { setAuthenticationChallenge } from "@/lib/challenge-store";
+import { getWebAuthnConfig } from "@/lib/webauthn";
 
-const RP_ID = process.env.NODE_ENV === "production" ? "pc.himansh.in" : "localhost";
-
-export async function GET() {
+export async function GET(request: Request) {
+  const { rpID } = getWebAuthnConfig(request);
   const passkeys = getPasskeys();
 
   if (passkeys.length === 0) {
@@ -16,7 +16,7 @@ export async function GET() {
   }
 
   const options = await generateAuthenticationOptions({
-    rpID: RP_ID,
+    rpID,
     allowCredentials: passkeys.map((p) => ({
       id: p.id,
       transports: p.transports as AuthenticatorTransport[] | undefined,
