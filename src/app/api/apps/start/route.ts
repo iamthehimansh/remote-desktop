@@ -38,13 +38,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "App already running" }, { status: 400 });
     }
 
-    // Generate a session token for app auth
-    const appToken = randomBytes(24).toString("hex");
+    // Use user-set password or generate a random one
+    const appToken = app.password || randomBytes(24).toString("hex");
 
     // Build command with substitutions
     let cmd = app.command
       .replace(/\{port\}/g, String(app.port))
-      .replace(/\{token\}/g, appToken);
+      .replace(/\{token\}/g, appToken)
+      .replace(/\{password\}/g, appToken)
+      .replace(/\{username\}/g, app.username || "admin");
 
     updateApp(id, { status: "starting" });
 

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   BookOpen, Code, Bot, Box, Play, Square, ExternalLink, Loader2,
-  Plus, Trash2, AppWindow,
+  Plus, Trash2, AppWindow, Settings, Eye, EyeOff,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,6 +27,8 @@ interface AppInfo {
   status: "stopped" | "starting" | "running";
   url?: string;
   custom?: boolean;
+  username?: string;
+  password?: string;
 }
 
 const ICONS: Record<string, any> = {
@@ -44,6 +46,11 @@ export default function AppsPage() {
     name: "", command: "", port: "", subdomain: "", description: "",
   });
   const [adding, setAdding] = useState(false);
+  const [settingsApp, setSettingsApp] = useState<AppInfo | null>(null);
+  const [editUsername, setEditUsername] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const fetchApps = useCallback(async () => {
     try {
@@ -111,15 +118,50 @@ export default function AppsPage() {
 
   const openApp = (app: AppInfo) => {
     let url = app.url || `https://${app.subdomain}.himansh.in`;
-    const token = appTokens[app.id];
+    // Use saved password or session token
+    const token = app.password || appTokens[app.id];
 
-    // Append auth token if available
     if (token && app.authType === "token-query" && app.authParam) {
       const sep = url.includes("?") ? "&" : "?";
       url = `${url}${sep}${app.authParam}=${token}`;
     }
 
     window.open(url, "_blank");
+  };
+
+  const openSettings = (app: AppInfo) => {
+    setSettingsApp(app);
+    setEditUsername(app.username || "");
+    setEditPassword(app.password || "");
+    setShowPassword(false);
+  };
+
+  const saveCredentials = async () => {
+    if (!settingsApp) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/apps/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: settingsApp.id,
+          username: editUsername,
+          password: editPassword,
+        }),
+      });
+      if (res.ok) {
+        toast({ title: "Credentials saved", description: "Will be used on next app start." });
+        setSettingsApp(null);
+        fetchApps();
+      } else {
+        const data = await res.json();
+        toast({ title: "Error", description: data.error, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Failed to save", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const createApp = async () => {
@@ -243,6 +285,15 @@ export default function AppsPage() {
                         </Button>
                       </>
                     )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => openSettings(app)}
+                      className="text-text-secondary hover:text-text-primary"
+                      title="Credentials"
+                    >
+                      <Settings className="h-3.5 w-3.5" />
+                    </Button>
                     {app.custom && (
                       <Button
                         size="sm"
@@ -329,6 +380,67 @@ export default function AppsPage() {
             >
               {adding ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Add App
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* App Credentials Dialog */}
+      <Dialog open={!!settingsApp} onOpenChange={() => setSettingsApp(null)}>
+        <DialogContent className="bg-surface border-border">
+          <DialogHeader>
+            <DialogTitle className="text-text-primary">
+              {settingsApp?.name} — Credentials
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-text-secondary">
+              Set username and password for this app. These are used when launching the app and for auto-login via the Open button.
+            </p>
+            <div>
+              <label className="text-xs text-text-secondary mb-1 block">Username</label>
+              <Input
+                placeholder="admin"
+                value={editUsername}
+                onChange={(e) => setEditUsername(e.target.value)}
+                className="bg-elevated border-border text-text-primary"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-text-secondary mb-1 block">Password / Token</label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Set a password"
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    className="bg-elevated border-border text-text-primary pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+            {settingsApp?.password && (
+              <p className="text-xs text-success">Credentials are set. Will be used on next start.</p>
+            )}
+            {!settingsApp?.password && (
+              <p className="text-xs text-warning">No credentials set. A random token will be generated on start.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={saveCredentials}
+              disabled={saving}
+              className="bg-accent hover:bg-accent-hover text-white"
+            >
+              {saving ? "Saving..." : "Save Credentials"}
             </Button>
           </DialogFooter>
         </DialogContent>

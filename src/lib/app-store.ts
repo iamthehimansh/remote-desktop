@@ -18,6 +18,8 @@ export interface AppConfig {
   dnsRecordId?: string;
   url?: string;
   custom?: boolean; // user-created app
+  username?: string; // app-level auth username
+  password?: string; // app-level auth password/token
 }
 
 const DATA_PATH = resolve(process.cwd(), "data/apps.json");
@@ -28,25 +30,28 @@ const DEFAULT_APPS: AppConfig[] = [
     name: "Jupyter Notebook",
     icon: "BookOpen",
     description: "Python notebooks with data science libraries",
-    command: "C:\\Users\\pc\\AppData\\Roaming\\Python\\Python314\\Scripts\\jupyter-lab.exe --no-browser --ip=0.0.0.0 --port={port} --IdentityProvider.token={token} --ServerApp.allow_origin=*",
+    command: "C:\\Users\\pc\\AppData\\Roaming\\Python\\Python314\\Scripts\\jupyter-lab.exe --no-browser --ip=0.0.0.0 --port={port} --IdentityProvider.token={password} --ServerApp.allow_origin=*",
     port: 8888,
     subdomain: "jupyter",
     authType: "token-query",
     authParam: "token",
     healthPath: "/api",
     status: "stopped",
+    password: "",
   },
   {
     id: "code-server",
     name: "VS Code Web",
     icon: "Code",
     description: "Full VS Code IDE in the browser",
-    command: "code serve-web --port {port} --host 0.0.0.0 --without-connection-token --accept-server-license-terms",
+    command: "code serve-web --port {port} --host 0.0.0.0 --accept-server-license-terms --connection-token {password}",
     port: 8443,
     subdomain: "code",
-    authType: "none",
+    authType: "token-query",
+    authParam: "tkn",
     healthPath: "/",
     status: "stopped",
+    password: "",
   },
   {
     id: "ollama-webui",
@@ -60,6 +65,8 @@ const DEFAULT_APPS: AppConfig[] = [
     envVars: { PYTHONIOENCODING: "utf-8" },
     healthPath: "/",
     status: "stopped",
+    username: "",
+    password: "",
   },
 ];
 
