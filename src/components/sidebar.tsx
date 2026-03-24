@@ -10,6 +10,7 @@ import {
   Monitor,
   FolderOpen,
   Network,
+  AppWindow,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -23,6 +24,7 @@ const navItems = [
   { href: "/dashboard/rdp", label: "Remote Desktop", icon: Monitor },
   { href: "/dashboard/files", label: "Files", icon: FolderOpen },
   { href: "/dashboard/ports", label: "Ports", icon: Network },
+  { href: "/dashboard/apps", label: "Apps", icon: AppWindow },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

@@ -5,6 +5,8 @@ import { signToken, createSessionCookie } from "@/lib/auth";
 import { getAuthenticationChallenge, deleteAuthenticationChallenge } from "@/lib/challenge-store";
 import { getWebAuthnConfig } from "@/lib/webauthn";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   const { rpID, origin } = getWebAuthnConfig(request);
   const body = await request.json();

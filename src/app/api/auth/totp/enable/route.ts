@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { authenticator } from "otplib";
 import { getTOTP, setTOTP } from "@/lib/auth-store";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   const { code } = await request.json();
 

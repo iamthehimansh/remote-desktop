@@ -3,6 +3,8 @@ import { authenticator } from "otplib";
 import { toDataURL } from "qrcode";
 import { setTOTP, getTOTP } from "@/lib/auth-store";
 
+export const dynamic = "force-dynamic";
+
 export async function POST() {
   const secret = authenticator.generateSecret();
   const otpauthUrl = authenticator.keyuri("admin", "PC Dashboard", secret);

@@ -3,6 +3,8 @@ import { authenticator } from "otplib";
 import { getTOTP } from "@/lib/auth-store";
 import { signToken, createSessionCookie } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   const { code } = await request.json();
 

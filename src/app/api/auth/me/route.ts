@@ -3,6 +3,8 @@ import { verifyToken, COOKIE_NAME } from "@/lib/auth";
 import { hasPasskeys, hasTOTP } from "@/lib/auth-store";
 import { parse } from "cookie";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   const cookieHeader = request.headers.get("cookie") || "";
   const cookies = parse(cookieHeader);

@@ -4,6 +4,8 @@ import { addPasskey } from "@/lib/auth-store";
 import { getRegistrationChallenge, deleteRegistrationChallenge } from "@/lib/challenge-store";
 import { getWebAuthnConfig } from "@/lib/webauthn";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   const { rpID, origin } = getWebAuthnConfig(request);
   const body = await request.json();

@@ -4,6 +4,7 @@ node_modules/
 data/auth.json
 data/port-forwards.json
 data/challenges.json
+data/apps.json
 bun.lockb
 *.tsbuildinfo
 next-env.d.ts

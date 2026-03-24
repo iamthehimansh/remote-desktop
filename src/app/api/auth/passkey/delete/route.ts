@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { removePasskey } from "@/lib/auth-store";
 
+export const dynamic = "force-dynamic";
+
 export async function DELETE(request: Request) {
   const { id } = await request.json();
 
