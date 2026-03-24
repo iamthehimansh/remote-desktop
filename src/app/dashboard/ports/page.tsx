@@ -208,7 +208,7 @@ export default function PortsPage() {
                   className="bg-elevated border-border text-text-primary rounded-r-none"
                 />
                 <span className="px-3 py-2 bg-elevated border border-l-0 border-border text-text-secondary text-sm rounded-r-md whitespace-nowrap">
-                  .pc.himansh.in
+                  .himansh.in
                 </span>
               </div>
             </div>

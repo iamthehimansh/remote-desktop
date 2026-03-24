@@ -23,14 +23,11 @@ export async function DELETE(request: Request) {
       console.warn("DNS record deletion failed:", err);
     }
 
-    // 2. Remove ingress rule
-    removeIngressRule(forward.hostname);
-
-    // 3. Reload tunnel
+    // 2. Remove ingress rule via Cloudflare API (auto-applied, no restart)
     try {
-      await reloadTunnel();
+      await removeIngressRule(forward.hostname);
     } catch (err) {
-      console.warn("Tunnel reload failed:", err);
+      console.warn("Ingress rule removal failed:", err);
     }
 
     return NextResponse.json({ success: true });

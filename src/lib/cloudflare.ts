@@ -16,7 +16,7 @@ export async function createDNSRecord(subdomain: string): Promise<{ id: string; 
     headers: getHeaders(),
     body: JSON.stringify({
       type: "CNAME",
-      name: `${subdomain}.pc`,
+      name: subdomain,
       content: `${tunnelId}.cfargotunnel.com`,
       proxied: true,
       comment: "Created by PC Dashboard",
