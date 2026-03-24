@@ -40,6 +40,7 @@ console.log(`JWT_SECRET loaded: ${JWT_SECRET ? "yes (" + JWT_SECRET.length + " c
 
 const SHELLS: Record<string, { command: string; args: string[] }> = {
   powershell: { command: "powershell.exe", args: [] },
+  "powershell-admin": { command: "sudo.exe", args: ["powershell.exe"] },
   cmd: { command: "cmd.exe", args: [] },
   wsl: { command: "wsl.exe", args: [] },
 };

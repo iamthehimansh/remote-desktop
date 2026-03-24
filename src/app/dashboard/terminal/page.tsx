@@ -18,6 +18,7 @@ interface TerminalTab {
 
 const SHELLS = [
   { value: "powershell", label: "PowerShell" },
+  { value: "powershell-admin", label: "PowerShell (Admin)" },
   { value: "cmd", label: "CMD" },
   { value: "wsl", label: "WSL" },
 ];
