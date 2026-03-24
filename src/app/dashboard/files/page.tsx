@@ -61,10 +61,17 @@ export default function FilesPage() {
     }
   }, [toast]);
 
-  useEffect(() => { fetchDir(); }, [fetchDir]);
+  useEffect(() => { fetchDir("drives"); }, [fetchDir]);
 
-  const navigate = (name: string) => fetchDir(`${currentPath}\\${name}`);
-  const goUp = () => parentPath && fetchDir(parentPath);
+  const navigate = (name: string) => {
+    if (currentPath === "drives") {
+      // Clicking a drive like "C:" navigates to "C:\"
+      fetchDir(`${name}\\`);
+    } else {
+      fetchDir(`${currentPath}\\${name}`);
+    }
+  };
+  const goUp = () => parentPath && fetchDir(parentPath === "drives" ? "drives" : parentPath);
 
   const handleUpload = async (files: FileList) => {
     const formData = new FormData();
@@ -158,7 +165,8 @@ export default function FilesPage() {
     if (e.dataTransfer.files.length) handleUpload(e.dataTransfer.files);
   };
 
-  const breadcrumbs = currentPath.split("\\").filter(Boolean);
+  const isDrives = currentPath === "drives";
+  const breadcrumbs = isDrives ? [] : currentPath.split("\\").filter(Boolean);
   const filtered = items.filter((i) => i.name.toLowerCase().includes(search.toLowerCase()));
 
   const toggleSelect = (name: string) => {
@@ -188,9 +196,12 @@ export default function FilesPage() {
 
         {/* Breadcrumbs */}
         <div className="flex items-center gap-1 text-xs text-text-secondary overflow-hidden flex-1 min-w-0">
+          <button onClick={() => fetchDir("drives")} className="hover:text-text-primary shrink-0 font-medium">
+            My PC
+          </button>
           {breadcrumbs.map((seg, i) => (
             <span key={i} className="flex items-center shrink-0">
-              {i > 0 && <ChevronRight className="h-3 w-3 mx-0.5" />}
+              <ChevronRight className="h-3 w-3 mx-0.5" />
               <button
                 onClick={() => fetchDir(breadcrumbs.slice(0, i + 1).join("\\"))}
                 className="hover:text-text-primary truncate max-w-[120px]"

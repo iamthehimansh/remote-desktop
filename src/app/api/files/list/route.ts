@@ -1,13 +1,26 @@
 import { NextResponse } from "next/server";
 import { readdir, stat } from "fs/promises";
-import { join, dirname, extname } from "path";
-import { safePath, getFileManagerRoot } from "@/lib/files";
+import { join, dirname, extname, normalize } from "path";
+import { safePath, getFileManagerRoot, getDrives } from "@/lib/files";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const requestedPath = searchParams.get("path") || getFileManagerRoot();
+  const requestedPath = searchParams.get("path");
+
+  // If no path or "drives" requested, show available drives
+  if (!requestedPath || requestedPath === "drives") {
+    const drives = await getDrives();
+    const items = drives.map((d) => ({
+      name: d.replace("\\", ""),
+      type: "directory" as const,
+      size: 0,
+      modified: null,
+      extension: null,
+    }));
+    return NextResponse.json({ path: "drives", parent: null, items });
+  }
 
   try {
     const dirPath = safePath(requestedPath);
@@ -43,14 +56,16 @@ export async function GET(request: Request) {
       return a.name.localeCompare(b.name);
     });
 
-    const root = getFileManagerRoot();
-    const parent = dirPath === root ? null : dirname(dirPath);
+    // Parent: go up one level, or back to drives list for root of a drive
+    const normalized = normalize(dirPath);
+    const parentDir = dirname(normalized);
+    const parent = parentDir === normalized ? "drives" : parentDir;
 
     return NextResponse.json({ path: dirPath, parent, items });
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "Failed to list directory" },
-      { status: error.message?.includes("Access denied") ? 403 : 500 }
+      { status: 500 }
     );
   }
 }
