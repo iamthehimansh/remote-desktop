@@ -9,6 +9,12 @@ import { ProcessTable } from "@/components/process-table";
 import { formatBytes, formatPercent } from "@/lib/utils";
 import { Cpu, MemoryStick, MonitorSpeaker, HardDrive } from "lucide-react";
 
+function diskColor(usage: number): string {
+  if (usage < 60) return "text-success";
+  if (usage < 85) return "text-warning";
+  return "text-danger";
+}
+
 export default function OverviewPage() {
   const { stats, isConnected } = useSystemStats();
 
@@ -30,8 +36,8 @@ export default function OverviewPage() {
         </span>
       </div>
 
-      {/* Stat cards — CPU, RAM, GPU */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {/* CPU + Memory */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <StatCard
           title="CPU"
           value={formatPercent(stats.cpu.usage)}
@@ -48,19 +54,31 @@ export default function OverviewPage() {
           color="text-success"
           progress={stats.memory.usage}
         />
-        <StatCard
-          title="GPU"
-          value={stats.gpu ? formatPercent(stats.gpu.usage) : "N/A"}
-          subtitle={stats.gpu ? `${stats.gpu.model}${stats.gpu.temperature ? ` | ${stats.gpu.temperature}°C` : ""}${stats.gpu.vramUsed ? ` | VRAM ${formatBytes(stats.gpu.vramUsed)}/${formatBytes(stats.gpu.vramTotal)}` : ""}` : "No GPU detected"}
-          icon={MonitorSpeaker}
-          color="text-warning"
-          progress={stats.gpu?.usage}
-        />
       </div>
 
-      {/* Disk cards — show ALL drives */}
+      {/* GPU cards — show ALL GPUs */}
+      {stats.gpus.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {stats.gpus.map((gpu, i) => {
+            const isNvidia = gpu.vendor.toLowerCase().includes("nvidia") || gpu.model.toLowerCase().includes("nvidia") || gpu.model.toLowerCase().includes("geforce");
+            return (
+              <StatCard
+                key={i}
+                title={isNvidia ? "NVIDIA GPU" : "iGPU"}
+                value={formatPercent(gpu.usage)}
+                subtitle={`${gpu.model}${gpu.temperature ? ` | ${gpu.temperature}°C` : ""}${gpu.vramUsed ? ` | VRAM ${formatBytes(gpu.vramUsed)}/${formatBytes(gpu.vramTotal)}` : ""}`}
+                icon={MonitorSpeaker}
+                color={isNvidia ? "text-success" : "text-warning"}
+                progress={gpu.usage}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Disk cards — show ALL drives with dynamic color */}
       {stats.disk.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {stats.disk.map((d) => (
             <StatCard
               key={d.mount}
@@ -68,7 +86,7 @@ export default function OverviewPage() {
               value={`${formatBytes(d.used)} / ${formatBytes(d.total)}`}
               subtitle={`${d.name} | ${formatPercent(d.usage)}`}
               icon={HardDrive}
-              color="text-danger"
+              color={diskColor(d.usage)}
               progress={d.usage}
             />
           ))}

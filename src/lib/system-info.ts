@@ -15,13 +15,14 @@ interface SystemStats {
     free: number;
     usage: number;
   };
-  gpu: {
+  gpus: Array<{
     model: string;
+    vendor: string;
     usage: number;
     temperature: number | null;
     vramTotal: number;
     vramUsed: number;
-  } | null;
+  }>;
   disk: Array<{
     name: string;
     type: string;
@@ -64,10 +65,7 @@ export async function getSystemStats(): Promise<SystemStats> {
       si.time(),
     ]);
 
-  // Prefer dedicated NVIDIA/AMD GPU over integrated Intel
-  const gpu = graphics.controllers.find(
-    (g) => g.vendor?.toLowerCase().includes("nvidia") || g.vendor?.toLowerCase().includes("amd") || g.model?.toLowerCase().includes("nvidia") || g.model?.toLowerCase().includes("radeon")
-  ) || graphics.controllers[0];
+  // Include all GPUs
   const netTotal = networkStats.reduce(
     (acc, iface) => ({
       upload: acc.upload + (iface.tx_sec || 0),
@@ -91,15 +89,16 @@ export async function getSystemStats(): Promise<SystemStats> {
       free: mem.free,
       usage: (mem.used / mem.total) * 100,
     },
-    gpu: gpu
-      ? {
-          model: gpu.model,
-          usage: gpu.utilizationGpu ?? 0,
-          temperature: gpu.temperatureGpu ?? null,
-          vramTotal: (gpu.vram ?? 0) * 1024 * 1024,
-          vramUsed: (gpu.memoryUsed ?? 0) * 1024 * 1024,
-        }
-      : null,
+    gpus: graphics.controllers
+      .filter((g) => g.model && g.model !== "Unknown")
+      .map((g) => ({
+        model: g.model,
+        vendor: g.vendor || "",
+        usage: g.utilizationGpu ?? 0,
+        temperature: g.temperatureGpu ?? null,
+        vramTotal: (g.vram ?? 0) * 1024 * 1024,
+        vramUsed: (g.memoryUsed ?? 0) * 1024 * 1024,
+      })),
     disk: disks
       .filter((d) => d.size > 0)
       .map((d) => ({

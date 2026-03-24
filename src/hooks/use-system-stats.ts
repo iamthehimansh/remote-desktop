@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 interface SystemStats {
   cpu: { model: string; cores: number; threads: number; speed: number; usage: number; temperature: number | null };
   memory: { total: number; used: number; free: number; usage: number };
-  gpu: { model: string; usage: number; temperature: number | null; vramTotal: number; vramUsed: number } | null;
+  gpus: Array<{ model: string; vendor: string; usage: number; temperature: number | null; vramTotal: number; vramUsed: number }>;
   disk: Array<{ name: string; type: string; total: number; used: number; usage: number; mount: string }>;
   network: { upload: number; download: number };
   os: { hostname: string; platform: string; uptime: number };
