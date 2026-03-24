@@ -62,7 +62,7 @@ export default function RdpPage() {
   const guacUrl = typeof window !== "undefined"
     ? window.location.hostname === "localhost"
       ? "http://localhost:8080/guacamole/#/"
-      : `${window.location.protocol}//${window.location.host}/guac/guacamole/#/`
+      : `${window.location.protocol}//${window.location.host}/guacamole/#/`
     : "";
 
   if (checking) {
