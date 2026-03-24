@@ -18,7 +18,7 @@ interface SystemStats {
   gpus: Array<{
     model: string;
     vendor: string;
-    usage: number;
+    usage: number | null;
     temperature: number | null;
     vramTotal: number;
     vramUsed: number;
@@ -94,7 +94,7 @@ export async function getSystemStats(): Promise<SystemStats> {
       .map((g) => ({
         model: g.model,
         vendor: g.vendor || "",
-        usage: g.utilizationGpu ?? 0,
+        usage: g.utilizationGpu ?? null,
         temperature: g.temperatureGpu ?? null,
         vramTotal: (g.vram ?? 0) * 1024 * 1024,
         vramUsed: (g.memoryUsed ?? 0) * 1024 * 1024,

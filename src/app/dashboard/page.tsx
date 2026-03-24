@@ -65,11 +65,11 @@ export default function OverviewPage() {
               <StatCard
                 key={i}
                 title={isNvidia ? "NVIDIA GPU" : "iGPU"}
-                value={formatPercent(gpu.usage)}
+                value={gpu.usage !== null ? formatPercent(gpu.usage) : "N/A"}
                 subtitle={`${gpu.model}${gpu.temperature ? ` | ${gpu.temperature}°C` : ""}${gpu.vramUsed ? ` | VRAM ${formatBytes(gpu.vramUsed)}/${formatBytes(gpu.vramTotal)}` : ""}`}
                 icon={MonitorSpeaker}
                 color={isNvidia ? "text-success" : "text-warning"}
-                progress={gpu.usage}
+                progress={gpu.usage ?? undefined}
               />
             );
           })}
