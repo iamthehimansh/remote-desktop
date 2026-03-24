@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Fingerprint, Smartphone, Trash2, Plus, Key, Monitor, Clock } from "lucide-react";
+import { Fingerprint, Smartphone, Trash2, Plus, Key, Monitor, Clock, Lock } from "lucide-react";
 import { startRegistration } from "@simplewebauthn/browser";
 import { useToast } from "@/hooks/use-toast";
 
@@ -26,6 +26,10 @@ export default function SettingsPage() {
   const [passkeyName, setPasskeyName] = useState("");
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -156,6 +160,34 @@ export default function SettingsPage() {
     } catch {}
   };
 
+  const changePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Error", description: "Passwords don't match", variant: "destructive" });
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      if (res.ok) {
+        toast({ title: "Password changed", description: "Use the new password next time you log in." });
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        const data = await res.json();
+        toast({ title: "Error", description: data.error, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to change password", variant: "destructive" });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const getTransportIcon = (transports?: string[]) => {
     if (transports?.includes("internal")) return <Fingerprint className="h-4 w-4 text-accent" />;
     if (transports?.includes("usb")) return <Key className="h-4 w-4 text-warning" />;
@@ -166,6 +198,52 @@ export default function SettingsPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <h1 className="text-2xl font-semibold text-text-primary">Settings</h1>
+
+      {/* Change Password */}
+      <Card className="bg-surface border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-text-primary">
+            <Lock className="h-5 w-5" />
+            Change Password
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <label className="text-xs text-text-secondary mb-1 block">Current Password</label>
+            <Input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="bg-elevated border-border text-text-primary"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-text-secondary mb-1 block">New Password</label>
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="bg-elevated border-border text-text-primary"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-text-secondary mb-1 block">Confirm New Password</label>
+            <Input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="bg-elevated border-border text-text-primary"
+            />
+          </div>
+          <Button
+            onClick={changePassword}
+            disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+            className="bg-accent hover:bg-accent-hover text-white"
+          >
+            {changingPassword ? "Changing..." : "Change Password"}
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Passkeys */}
       <Card className="bg-surface border-border">
