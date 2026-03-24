@@ -28,7 +28,9 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
 
   return (
     <TooltipProvider delayDuration={0}>

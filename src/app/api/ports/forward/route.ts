@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createDNSRecord } from "@/lib/cloudflare";
-import { addIngressRule, reloadTunnel } from "@/lib/tunnel-config";
+import { addIngressRule } from "@/lib/tunnel-config";
 import { addForward } from "@/lib/port-store";
 import { randomBytes } from "crypto";
 

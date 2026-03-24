@@ -21,7 +21,7 @@ export default function OverviewPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Status indicator */}
       <div className="flex items-center gap-2">
         <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-success" : "bg-danger"}`} />
@@ -30,8 +30,8 @@ export default function OverviewPage() {
         </span>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stat cards — CPU, RAM, GPU */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <StatCard
           title="CPU"
           value={formatPercent(stats.cpu.usage)}
@@ -51,23 +51,32 @@ export default function OverviewPage() {
         <StatCard
           title="GPU"
           value={stats.gpu ? formatPercent(stats.gpu.usage) : "N/A"}
-          subtitle={stats.gpu ? `${stats.gpu.model}${stats.gpu.temperature ? ` | ${stats.gpu.temperature}°C` : ""}` : "No GPU detected"}
+          subtitle={stats.gpu ? `${stats.gpu.model}${stats.gpu.temperature ? ` | ${stats.gpu.temperature}°C` : ""}${stats.gpu.vramUsed ? ` | VRAM ${formatBytes(stats.gpu.vramUsed)}/${formatBytes(stats.gpu.vramTotal)}` : ""}` : "No GPU detected"}
           icon={MonitorSpeaker}
           color="text-warning"
           progress={stats.gpu?.usage}
         />
-        <StatCard
-          title="Disk"
-          value={stats.disk[0] ? `${formatBytes(stats.disk[0].used)} / ${formatBytes(stats.disk[0].total)}` : "N/A"}
-          subtitle={stats.disk[0] ? `${stats.disk[0].mount} | ${formatPercent(stats.disk[0].usage)}` : ""}
-          icon={HardDrive}
-          color="text-danger"
-          progress={stats.disk[0]?.usage}
-        />
       </div>
 
+      {/* Disk cards — show ALL drives */}
+      {stats.disk.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {stats.disk.map((d) => (
+            <StatCard
+              key={d.mount}
+              title={`Disk ${d.mount}`}
+              value={`${formatBytes(d.used)} / ${formatBytes(d.total)}`}
+              subtitle={`${d.name} | ${formatPercent(d.usage)}`}
+              icon={HardDrive}
+              color="text-danger"
+              progress={d.usage}
+            />
+          ))}
+        </div>
+      )}
+
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         <CpuChart usage={stats.cpu.usage} />
         <MemoryChart usage={stats.memory.usage} />
         <NetworkChart upload={stats.network.upload} download={stats.network.download} />

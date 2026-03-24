@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { deleteDNSRecord } from "@/lib/cloudflare";
-import { removeIngressRule, reloadTunnel } from "@/lib/tunnel-config";
+import { removeIngressRule } from "@/lib/tunnel-config";
 import { removeForward } from "@/lib/port-store";
 
 export async function DELETE(request: Request) {

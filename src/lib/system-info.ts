@@ -64,7 +64,10 @@ export async function getSystemStats(): Promise<SystemStats> {
       si.time(),
     ]);
 
-  const gpu = graphics.controllers[0];
+  // Prefer dedicated NVIDIA/AMD GPU over integrated Intel
+  const gpu = graphics.controllers.find(
+    (g) => g.vendor?.toLowerCase().includes("nvidia") || g.vendor?.toLowerCase().includes("amd") || g.model?.toLowerCase().includes("nvidia") || g.model?.toLowerCase().includes("radeon")
+  ) || graphics.controllers[0];
   const netTotal = networkStats.reduce(
     (acc, iface) => ({
       upload: acc.upload + (iface.tx_sec || 0),
