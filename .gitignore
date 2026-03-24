@@ -1,0 +1,8 @@
+node_modules/
+.next/
+.env.local
+data/auth.json
+data/port-forwards.json
+bun.lockb
+*.tsbuildinfo
+next-env.d.ts

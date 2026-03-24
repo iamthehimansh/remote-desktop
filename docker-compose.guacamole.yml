@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  guacd:
+    image: guacamole/guacd
+    container_name: pc-dash-guacd
+    restart: unless-stopped
+    networks:
+      - guac-net
+
+  guacamole:
+    image: guacamole/guacamole
+    container_name: pc-dash-guacamole
+    restart: unless-stopped
+    depends_on:
+      - guacd
+    ports:
+      - "8080:8080"
+    environment:
+      GUACD_HOSTNAME: guacd
+      GUACD_PORT: 4822
+    volumes:
+      - ./guacamole-config/user-mapping.xml:/etc/guacamole/user-mapping.xml:ro
+      - ./guacamole-config/guacamole.properties:/etc/guacamole/guacamole.properties:ro
+    networks:
+      - guac-net
+
+networks:
+  guac-net:
+    driver: bridge

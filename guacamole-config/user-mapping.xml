@@ -1,0 +1,18 @@
+<user-mapping>
+    <authorize username="admin" password="admin">
+        <connection name="Windows Desktop">
+            <protocol>rdp</protocol>
+            <param name="hostname">host.docker.internal</param>
+            <param name="port">3389</param>
+            <param name="username">YOUR_USERNAME</param>
+            <param name="password">YOUR_WINDOWS_PASSWORD</param>
+            <param name="security">nla</param>
+            <param name="ignore-cert">true</param>
+            <param name="color-depth">32</param>
+            <param name="enable-wallpaper">true</param>
+            <param name="enable-font-smoothing">true</param>
+            <param name="enable-desktop-composition">true</param>
+            <param name="resize-method">display-update</param>
+        </connection>
+    </authorize>
+</user-mapping>
