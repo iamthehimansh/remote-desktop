@@ -1,24 +1,39 @@
 #Requires -RunAsAdministrator
-# Register PC Dashboard to auto-start on login via Registry Run key.
-# Also verifies Windows auto-login is configured.
+# Register PC Dashboard to auto-start on login with admin privileges.
+# Uses Scheduled Task (runs elevated without UAC prompt).
 
 $ErrorActionPreference = "Continue"
 
 $StartScript = "H:\remote-desktop\scripts\start-dashboard.bat"
 
 # ============================================================
-# Register dashboard startup via Registry Run key
+# Remove old Registry Run key (replaced by Scheduled Task)
 # ============================================================
 Write-Host ""
-Write-Host "=== Register dashboard auto-start ===" -ForegroundColor Cyan
-
-$regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
-Set-ItemProperty -Path $regPath -Name "PCDashboard" -Value $StartScript
-$val = (Get-ItemProperty -Path $regPath -Name "PCDashboard").PCDashboard
-Write-Host "Registry Run key set: $val" -ForegroundColor Green
+Write-Host "=== Removing old Registry Run key ===" -ForegroundColor Cyan
+Remove-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -Name "PCDashboard" -ErrorAction SilentlyContinue
+Write-Host "Old registry key removed." -ForegroundColor Green
 
 # ============================================================
-# Verify Windows auto-login is configured
+# Register as Scheduled Task with HIGHEST privileges (no UAC)
+# ============================================================
+Write-Host ""
+Write-Host "=== Register elevated startup task ===" -ForegroundColor Cyan
+
+$taskName = "PCDashboardStartup"
+Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+
+$action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$StartScript`""
+$trigger = New-ScheduledTaskTrigger -AtLogOn -User "pc"
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 0)
+$principal = New-ScheduledTaskPrincipal -UserId "pc" -RunLevel Highest -LogonType Interactive
+
+Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description "Start PC Dashboard with admin privileges on login"
+
+Write-Host "Scheduled task '$taskName' registered with HIGHEST privileges." -ForegroundColor Green
+
+# ============================================================
+# Verify Windows auto-login
 # ============================================================
 Write-Host ""
 Write-Host "=== Verify Windows auto-login ===" -ForegroundColor Cyan
@@ -37,40 +52,16 @@ if ($autoLogin -eq "1") {
     Set-ItemProperty -Path $autoLoginPath -Name "AutoAdminLogon" -Value "1"
     Set-ItemProperty -Path $autoLoginPath -Name "DefaultUserName" -Value $user
     Set-ItemProperty -Path $autoLoginPath -Name "DefaultPassword" -Value $plainPass
-    Write-Host "Auto-login configured for user: pc" -ForegroundColor Green
-    Write-Host "NOTE: Password is stored in registry in plain text. This is how Windows auto-login works." -ForegroundColor Yellow
+    Write-Host "Auto-login configured for user: $user" -ForegroundColor Green
 }
-
-# ============================================================
-# Also register as a Scheduled Task (backup, runs even if login fails)
-# ============================================================
-Write-Host ""
-Write-Host "=== Register scheduled task (backup) ===" -ForegroundColor Cyan
-
-$taskName = "PCDashboardStartup"
-$existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-
-if ($existingTask) {
-    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-    Write-Host "Removed old scheduled task." -ForegroundColor Yellow
-}
-
-$action = New-ScheduledTaskAction -Execute $StartScript
-$trigger = New-ScheduledTaskTrigger -AtStartup
-$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
-$principal = New-ScheduledTaskPrincipal -UserId "pc" -LogonType S4U -RunLevel Highest
-
-Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description "Start PC Dashboard on boot"
-Write-Host "Scheduled task '$taskName' registered." -ForegroundColor Green
 
 # ============================================================
 # Summary
 # ============================================================
 Write-Host ""
 Write-Host "=== Summary ===" -ForegroundColor Cyan
-Write-Host "1. Registry Run key: PCDashboard -> $StartScript"
-Write-Host "2. Scheduled Task: $taskName (runs at startup)"
-Write-Host "3. Auto-login: user=pc"
+Write-Host "Scheduled Task: $taskName (runs elevated at logon)"
+Write-Host "Script: $StartScript"
 Write-Host ""
-Write-Host "On next boot: Windows auto-logs in -> start-dashboard.bat runs -> Next.js + Terminal server start" -ForegroundColor Green
+Write-Host "On boot: Windows auto-logs in -> Task runs elevated -> Dashboard + Terminal start as admin" -ForegroundColor Green
 Write-Host ""

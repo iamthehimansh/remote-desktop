@@ -38,10 +38,12 @@ const JWT_SECRET = process.env.JWT_SECRET || "";
 
 console.log(`JWT_SECRET loaded: ${JWT_SECRET ? "yes (" + JWT_SECRET.length + " chars)" : "NO - auth will fail!"}`);
 
+// When the WS server runs elevated (via start-dashboard.bat running as admin),
+// ALL spawned shells inherit admin privileges automatically.
 const SHELLS: Record<string, { command: string; args: string[] }> = {
   powershell: { command: "powershell.exe", args: [] },
-  "powershell-admin": { command: "sudo.exe", args: ["powershell.exe"] },
-  cmd: { command: "cmd.exe", args: [] },
+  "powershell-admin": { command: "powershell.exe", args: ["-ExecutionPolicy", "Bypass"] },
+  cmd: { command: "cmd.exe", args: ["/K", "title Admin CMD"] },
   wsl: { command: "wsl.exe", args: [] },
 };
 
