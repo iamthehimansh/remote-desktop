@@ -12,6 +12,9 @@ if %errorlevel% neq 0 (
 
 cd /d H:\remote-desktop
 
+:: Start Docker Desktop (non-blocking)
+start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+
 :: Wait for network to be ready
 timeout /t 10 /nobreak >nul
 
