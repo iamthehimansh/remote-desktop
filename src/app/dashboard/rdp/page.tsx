@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,11 +14,11 @@ export default function RdpPage() {
   const [loadingText, setLoadingText] = useState("");
   const [fullscreen, setFullscreen] = useState(false);
   const [checking, setChecking] = useState(true);
-  const containerRef = useRef<HTMLDivElement>(null);
-
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen().catch(() => {});
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error("Fullscreen failed:", err);
+      });
     } else {
       document.exitFullscreen().catch(() => {});
     }
@@ -123,7 +123,7 @@ export default function RdpPage() {
   }
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full -m-6 bg-background">
+    <div className={`flex flex-col bg-background ${fullscreen ? "fixed inset-0 z-[9999]" : "h-full -m-6"}`}>
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 h-10 bg-surface border-b border-border shrink-0">
         <div className="flex items-center gap-2">
