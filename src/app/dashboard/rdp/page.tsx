@@ -1,33 +1,34 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Monitor, Power, Maximize2, Minimize2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import screenfull from "screenfull";
 
 export default function RdpPage() {
   const { toast } = useToast();
   const [running, setRunning] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("");
-  const [fullscreen, setFullscreen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [checking, setChecking] = useState(true);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
   const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch((err) => {
-        console.error("Fullscreen failed:", err);
-      });
-    } else {
-      document.exitFullscreen().catch(() => {});
+    if (screenfull.isEnabled && wrapperRef.current) {
+      screenfull.toggle(wrapperRef.current);
     }
   }, []);
 
   useEffect(() => {
-    const handler = () => setFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", handler);
-    return () => document.removeEventListener("fullscreenchange", handler);
+    if (screenfull.isEnabled) {
+      const handler = () => setIsFullscreen(screenfull.isFullscreen);
+      screenfull.on("change", handler);
+      return () => { screenfull.off("change", handler); };
+    }
   }, []);
 
   useEffect(() => {
@@ -46,7 +47,6 @@ export default function RdpPage() {
       const data = await res.json();
       if (data.status === "running" || data.status === "starting") {
         setLoadingText("Waiting for Guacamole...");
-        // Give it a moment to fully initialize
         await new Promise((r) => setTimeout(r, 2000));
         setRunning(true);
         toast({ title: "Remote Desktop started" });
@@ -66,6 +66,7 @@ export default function RdpPage() {
     try {
       await fetch("/api/rdp/stop", { method: "POST" });
       setRunning(false);
+      if (isFullscreen && screenfull.isEnabled) screenfull.exit();
       toast({ title: "Remote Desktop stopped" });
     } catch {
       toast({ title: "Failed to stop", variant: "destructive" });
@@ -123,9 +124,13 @@ export default function RdpPage() {
   }
 
   return (
-    <div className={`flex flex-col bg-background ${fullscreen ? "fixed inset-0 z-[9999]" : "h-full -m-6"}`}>
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 h-10 bg-surface border-b border-border shrink-0">
+    <div ref={wrapperRef} className="flex flex-col h-full -m-6 bg-background">
+      {/* Toolbar — auto-hides in fullscreen, shows on hover */}
+      <div
+        className={`flex items-center justify-between px-4 bg-surface border-b border-border shrink-0 transition-all ${
+          isFullscreen ? "h-0 overflow-hidden hover:h-10 absolute top-0 left-0 right-0 z-50 opacity-0 hover:opacity-100" : "h-10"
+        }`}
+      >
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="bg-success/10 text-success text-xs">
             Connected
@@ -139,7 +144,7 @@ export default function RdpPage() {
             onClick={toggleFullscreen}
             className="text-text-secondary hover:text-text-primary"
           >
-            {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </Button>
           <Button
             variant="ghost"

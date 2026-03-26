@@ -41,6 +41,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^2.15.0",
+    "screenfull": "^6.0.2",
     "systeminformation": "^5.23.5",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
