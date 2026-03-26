@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,21 @@ export default function RdpPage() {
   const [loadingText, setLoadingText] = useState("");
   const [fullscreen, setFullscreen] = useState(false);
   const [checking, setChecking] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
 
   useEffect(() => {
     fetch("/api/rdp/status")
@@ -108,7 +123,7 @@ export default function RdpPage() {
   }
 
   return (
-    <div className={`flex flex-col ${fullscreen ? "fixed inset-0 z-50 bg-background" : "h-full -m-6"}`}>
+    <div ref={containerRef} className="flex flex-col h-full -m-6 bg-background">
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 h-10 bg-surface border-b border-border shrink-0">
         <div className="flex items-center gap-2">
@@ -121,7 +136,7 @@ export default function RdpPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setFullscreen(!fullscreen)}
+            onClick={toggleFullscreen}
             className="text-text-secondary hover:text-text-primary"
           >
             {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
