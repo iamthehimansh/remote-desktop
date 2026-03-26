@@ -14,13 +14,20 @@ export default function RdpPage() {
   const [loadingText, setLoadingText] = useState("");
   const [fullscreen, setFullscreen] = useState(false);
   const [checking, setChecking] = useState(true);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const toggleFullscreen = useCallback(() => {
+    const el = iframeRef.current;
+    if (!el) return;
     if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen().catch(() => {});
+      // Use iframe's requestFullscreen for true OS-level fullscreen
+      (el as any).requestFullscreen?.() ||
+      (el as any).webkitRequestFullscreen?.() ||
+      (el as any).msRequestFullscreen?.();
     } else {
-      document.exitFullscreen().catch(() => {});
+      document.exitFullscreen?.() ||
+      (document as any).webkitExitFullscreen?.() ||
+      (document as any).msExitFullscreen?.();
     }
   }, []);
 
@@ -123,7 +130,7 @@ export default function RdpPage() {
   }
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full -m-6 bg-background">
+    <div className="flex flex-col h-full -m-6 bg-background">
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 h-10 bg-surface border-b border-border shrink-0">
         <div className="flex items-center gap-2">
@@ -156,9 +163,11 @@ export default function RdpPage() {
 
       {/* Guacamole iframe */}
       <iframe
+        ref={iframeRef}
         src={guacUrl}
         className="flex-1 w-full border-0"
-        allow="clipboard-read; clipboard-write"
+        allow="clipboard-read; clipboard-write; fullscreen"
+        allowFullScreen
       />
     </div>
   );
