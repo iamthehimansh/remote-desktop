@@ -13,6 +13,7 @@ guacamole-config/user-mapping.xml
 shared/
 recordings/
 logs-*.txt
+dash-*.txt
 bun.lockb
 *.tsbuildinfo
 next-env.d.ts
