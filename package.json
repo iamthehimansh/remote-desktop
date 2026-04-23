@@ -8,7 +8,9 @@
     "start": "node --import tsx server/next-server.ts",
     "start:plain": "next start -p 3005",
     "server": "node --import tsx server/ws-server.ts",
-    "set-password": "bun run scripts/set-password.ts"
+    "set-password": "bun run scripts/set-password.ts",
+    "bootstrap-auth": "node --import tsx scripts/bootstrap-auth.ts",
+    "deploy-worker": "node --import tsx cf-worker/scripts/deploy.ts"
   },
   "dependencies": {
     "@radix-ui/react-context-menu": "^2.2.16",
@@ -61,6 +63,7 @@
     "@types/react-dom": "^18.3.5",
     "@types/ws": "^8.5.13",
     "autoprefixer": "^10.4.20",
+    "esbuild": "^0.28.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.21.0",

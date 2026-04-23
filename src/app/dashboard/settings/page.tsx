@@ -195,6 +195,22 @@ export default function SettingsPage() {
     return <Key className="h-4 w-4 text-text-secondary" />;
   };
 
+  const signOutEverywhere = async () => {
+    if (!confirm("This will sign you out on all devices AND invalidate all app sessions. Continue?")) return;
+    try {
+      const res = await fetch("/api/auth/rotate-secret", { method: "POST" });
+      if (res.ok) {
+        toast({ title: "Signed out everywhere", description: "All sessions invalidated." });
+        setTimeout(() => { window.location.href = "/login"; }, 500);
+      } else {
+        const data = await res.json();
+        toast({ title: "Error", description: data.error, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to rotate secret", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="max-w-2xl space-y-6">
       <h1 className="text-2xl font-semibold text-text-primary">Settings</h1>
@@ -401,6 +417,31 @@ export default function SettingsPage() {
               Disable TOTP
             </Button>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Danger zone */}
+      <Card className="bg-surface border-border border-danger/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-text-primary">
+            <Trash2 className="h-5 w-5 text-danger" />
+            Sign out everywhere
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-text-secondary mb-3">
+            Rotates the server-side JWT secret. All dashboard sessions AND all
+            app-level sessions (on every device, every protected app) are
+            invalidated immediately. Use this if you suspect a cookie leak.
+          </p>
+          <Button
+            onClick={signOutEverywhere}
+            variant="ghost"
+            className="text-danger hover:text-danger/80 hover:bg-danger/10"
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Sign out everywhere
+          </Button>
         </CardContent>
       </Card>
     </div>

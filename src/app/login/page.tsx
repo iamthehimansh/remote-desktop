@@ -16,6 +16,18 @@ interface AuthMethods {
   totp: boolean;
 }
 
+function isSafeReturn(val: string | null): string {
+  if (!val) return "/dashboard";
+  // Allow only relative paths starting with "/" (not "//" which could bypass)
+  if (val.startsWith("/") && !val.startsWith("//")) return val;
+  // Allow absolute URLs only to *.himansh.in
+  try {
+    const u = new URL(val);
+    if (u.hostname === "pc.himansh.in" || u.hostname.endsWith(".himansh.in")) return u.toString();
+  } catch {}
+  return "/dashboard";
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [password, setPassword] = useState("");
@@ -23,6 +35,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [shake, setShake] = useState(false);
+  const [returnUrl, setReturnUrl] = useState("/dashboard");
   const [methods, setMethods] = useState<AuthMethods>({
     password: true,
     passkey: false,
@@ -30,11 +43,18 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setReturnUrl(isSafeReturn(params.get("return")));
     fetch("/api/auth/methods")
       .then((r) => r.json())
       .then(setMethods)
       .catch(() => {});
   }, []);
+
+  const navigateAfterLogin = () => {
+    if (returnUrl.startsWith("/")) router.push(returnUrl);
+    else window.location.href = returnUrl;
+  };
 
   const showError = (msg: string) => {
     setError(msg);
@@ -55,7 +75,7 @@ export default function LoginPage() {
       });
 
       if (res.ok) {
-        router.push("/dashboard");
+        navigateAfterLogin();
       } else {
         const data = await res.json();
         showError(data.error || "Login failed");
@@ -89,7 +109,7 @@ export default function LoginPage() {
       });
 
       if (verifyRes.ok) {
-        router.push("/dashboard");
+        navigateAfterLogin();
       } else {
         const data = await verifyRes.json();
         showError(data.error || "Passkey login failed");
@@ -118,7 +138,7 @@ export default function LoginPage() {
       });
 
       if (res.ok) {
-        router.push("/dashboard");
+        navigateAfterLogin();
       } else {
         const data = await res.json();
         showError(data.error || "Invalid code");

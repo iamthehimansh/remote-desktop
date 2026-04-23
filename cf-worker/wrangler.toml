@@ -1,0 +1,19 @@
+name = "pcdash-gate"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+
+# Dashboard origin used for OAuth endpoints
+[vars]
+DASHBOARD_URL = "https://pc.himansh.in"
+COOKIE_SUFFIX = "nosuffix"  # overridden at deploy via secret/var
+
+# Secrets (set via `wrangler secret put` or our deploy script):
+#   JWT_SECRET             — same as dashboard; verifies signed JWTs
+#   OAUTH_CLIENT_SECRETS   — JSON object { <clientId>: <secret> }
+
+# KV namespace for rate limiting
+[[kv_namespaces]]
+binding = "PCDASH_RL"
+id = "placeholder_kv_id"
+
+# Routes are added per-app via the API, not listed here.

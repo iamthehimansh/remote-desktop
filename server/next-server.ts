@@ -57,7 +57,9 @@ function verifySession(req: IncomingMessage): boolean {
 
   const cookieHeader = req.headers.cookie || "";
   const cookies = parseCookie(cookieHeader);
-  const token = cookies["session"] || queryToken;
+  const suffix = process.env.COOKIE_SUFFIX || "nosuffix";
+  const cookieName = `__Secure-pcdash-local-${suffix}`;
+  const token = cookies[cookieName] || queryToken;
 
   if (!token || !JWT_SECRET) return false;
   try {

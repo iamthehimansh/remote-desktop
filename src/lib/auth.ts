@@ -2,10 +2,14 @@ import { compare } from "bcryptjs";
 import { sign, verify } from "jsonwebtoken";
 import { serialize } from "cookie";
 
-const COOKIE_NAME = "session";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
-export { COOKIE_NAME };
+// Dashboard session cookie. Scoped to pc.himansh.in only.
+// Name uses a fixed random suffix from env so no app can ever collide on the name.
+export function getCookieName(): string {
+  const suffix = process.env.COOKIE_SUFFIX || "nosuffix";
+  return `__Secure-pcdash-local-${suffix}`;
+}
 
 export async function verifyPassword(plain: string): Promise<boolean> {
   const hash = process.env.DASHBOARD_PASSWORD_HASH;
@@ -16,7 +20,7 @@ export async function verifyPassword(plain: string): Promise<boolean> {
 export function signToken(): string {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error("JWT_SECRET not set");
-  return sign({ sub: "admin" }, secret, { expiresIn: "7d" });
+  return sign({ sub: "admin", kind: "dashboard" }, secret, { expiresIn: "7d" });
 }
 
 export function verifyToken(token: string): { sub: string } | null {
@@ -30,20 +34,20 @@ export function verifyToken(token: string): { sub: string } | null {
 }
 
 export function createSessionCookie(token: string): string {
-  return serialize(COOKIE_NAME, token, {
+  return serialize(getCookieName(), token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: true,
+    sameSite: "lax",
     path: "/",
     maxAge: MAX_AGE,
   });
 }
 
 export function clearSessionCookie(): string {
-  return serialize(COOKIE_NAME, "", {
+  return serialize(getCookieName(), "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: true,
+    sameSite: "lax",
     path: "/",
     maxAge: 0,
   });

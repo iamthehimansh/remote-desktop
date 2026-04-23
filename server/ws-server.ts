@@ -248,7 +248,8 @@ function verifyAuth(req: any): boolean {
   if (!cookieHeader || !JWT_SECRET) return false;
   try {
     const cookies = parseCookie(cookieHeader);
-    const token = cookies["session"];
+    const suffix = process.env.COOKIE_SUFFIX || "nosuffix";
+    const token = cookies[`__Secure-pcdash-local-${suffix}`] || cookies["session"];
     if (!token) return false;
     verify(token, JWT_SECRET);
     return true;

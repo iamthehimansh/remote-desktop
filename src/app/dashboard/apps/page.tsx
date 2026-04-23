@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   BookOpen, Code, Bot, Box, Play, Square, ExternalLink, Loader2,
-  Plus, Trash2, AppWindow, Settings, Eye, EyeOff,
+  Plus, Trash2, AppWindow, Settings, Eye, EyeOff, Lock, Unlock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -29,6 +29,8 @@ interface AppInfo {
   custom?: boolean;
   username?: string;
   password?: string;
+  authEnabled?: boolean;
+  workerRouteId?: string;
 }
 
 const ICONS: Record<string, any> = {
@@ -51,6 +53,7 @@ export default function AppsPage() {
   const [editPassword, setEditPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [togglingAuth, setTogglingAuth] = useState<string | null>(null);
 
   const fetchApps = useCallback(async () => {
     try {
@@ -127,6 +130,29 @@ export default function AppsPage() {
     }
 
     window.open(url, "_blank");
+  };
+
+  const toggleAuth = async (app: AppInfo) => {
+    setTogglingAuth(app.id);
+    try {
+      const next = !app.authEnabled;
+      const res = await fetch("/api/apps/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: app.id, authEnabled: next }),
+      });
+      if (res.ok) {
+        toast({ title: next ? "Protection enabled" : "Protection disabled", description: `${app.subdomain}.himansh.in` });
+        fetchApps();
+      } else {
+        const data = await res.json();
+        toast({ title: "Error", description: data.error, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to update", variant: "destructive" });
+    } finally {
+      setTogglingAuth(null);
+    }
   };
 
   const openSettings = (app: AppInfo) => {
@@ -236,7 +262,14 @@ export default function AppsPage() {
                         <Icon className="h-6 w-6 text-accent" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-semibold text-text-primary">{app.name}</h3>
+                        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-1.5">
+                          {app.name}
+                          {app.authEnabled ? (
+                            <Lock className="h-3 w-3 text-success" />
+                          ) : (
+                            <Unlock className="h-3 w-3 text-text-secondary/50" />
+                          )}
+                        </h3>
                         <p className="text-xs text-text-secondary">{app.subdomain}.himansh.in:{app.port}</p>
                       </div>
                     </div>
@@ -285,6 +318,20 @@ export default function AppsPage() {
                         </Button>
                       </>
                     )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => toggleAuth(app)}
+                      disabled={togglingAuth === app.id}
+                      className={app.authEnabled ? "text-success hover:text-success/80" : "text-text-secondary hover:text-text-primary"}
+                      title={app.authEnabled ? "Protected — click to disable dashboard auth" : "Public — click to require dashboard login"}
+                    >
+                      {togglingAuth === app.id
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : app.authEnabled
+                          ? <Lock className="h-3.5 w-3.5" />
+                          : <Unlock className="h-3.5 w-3.5" />}
+                    </Button>
                     <Button
                       size="sm"
                       variant="ghost"

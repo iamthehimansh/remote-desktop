@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyToken, COOKIE_NAME } from "@/lib/auth";
+import { verifyToken, getCookieName } from "@/lib/auth";
 import { hasPasskeys, hasTOTP } from "@/lib/auth-store";
 import { parse } from "cookie";
 
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const cookieHeader = request.headers.get("cookie") || "";
   const cookies = parse(cookieHeader);
-  const token = cookies[COOKIE_NAME];
+  const token = cookies[getCookieName()];
 
   if (!token) {
     return NextResponse.json({ authenticated: false }, { status: 401 });

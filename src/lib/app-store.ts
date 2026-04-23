@@ -20,6 +20,10 @@ export interface AppConfig {
   custom?: boolean; // user-created app
   username?: string; // app-level auth username
   password?: string; // app-level auth password/token
+
+  // Dashboard SSO protection
+  authEnabled?: boolean;       // when true, Worker gates this app's subdomain
+  workerRouteId?: string;      // CF Worker route id (for removal)
 }
 
 const DATA_PATH = resolve(process.cwd(), "data/apps.json");
