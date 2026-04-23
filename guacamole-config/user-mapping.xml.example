@@ -59,10 +59,12 @@
             <!-- Keyboard -->
             <param name="server-layout">en-us-qwerty</param>
 
-            <!-- Session recording -->
+            <!-- Session recording disabled by default.
+                 Uncomment to enable — saves to /recordings (./recordings on host)
             <param name="recording-path">/recordings</param>
             <param name="create-recording-path">true</param>
             <param name="recording-name">${GUAC_DATE}-${GUAC_TIME}</param>
+            -->
         </connection>
     </authorize>
 </user-mapping>
