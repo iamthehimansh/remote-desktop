@@ -5,6 +5,11 @@ services:
     image: guacamole/guacd
     container_name: pc-dash-guacd
     restart: unless-stopped
+    volumes:
+      # Shared folder for RDP drive redirection (drag/drop files)
+      - ./shared:/shared
+      # Session recordings
+      - ./recordings:/recordings
     networks:
       - guac-net
 
@@ -22,6 +27,8 @@ services:
     volumes:
       - ./guacamole-config/user-mapping.xml:/etc/guacamole/user-mapping.xml:ro
       - ./guacamole-config/guacamole.properties:/etc/guacamole/guacamole.properties:ro
+      - ./shared:/shared
+      - ./recordings:/recordings
     networks:
       - guac-net
 

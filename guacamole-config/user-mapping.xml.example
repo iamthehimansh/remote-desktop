@@ -2,17 +2,67 @@
     <authorize username="admin" password="admin">
         <connection name="Windows Desktop">
             <protocol>rdp</protocol>
+
+            <!-- Connection -->
             <param name="hostname">host.docker.internal</param>
             <param name="port">3389</param>
             <param name="username">YOUR_WINDOWS_USERNAME</param>
             <param name="password">YOUR_WINDOWS_PASSWORD</param>
             <param name="security">nla</param>
             <param name="ignore-cert">true</param>
+
+            <!-- Display -->
             <param name="color-depth">32</param>
-            <param name="enable-wallpaper">true</param>
-            <param name="enable-font-smoothing">true</param>
-            <param name="enable-desktop-composition">true</param>
+            <param name="dpi">96</param>
             <param name="resize-method">display-update</param>
+
+            <!-- Visual effects -->
+            <param name="enable-wallpaper">true</param>
+            <param name="enable-theming">true</param>
+            <param name="enable-font-smoothing">true</param>
+            <param name="enable-full-window-drag">true</param>
+            <param name="enable-desktop-composition">true</param>
+            <param name="enable-menu-animations">true</param>
+
+            <!-- Performance / GPU -->
+            <param name="enable-remotefx">true</param>
+
+            <!-- Clipboard -->
+            <param name="disable-copy">false</param>
+            <param name="disable-paste">false</param>
+
+            <!-- Audio -->
+            <param name="enable-audio">true</param>
+            <param name="enable-audio-input">true</param>
+
+            <!-- Drive redirection (drag/drop files) -->
+            <param name="enable-drive">true</param>
+            <param name="drive-name">Browser Drive</param>
+            <param name="drive-path">/shared</param>
+            <param name="create-drive-path">true</param>
+
+            <!-- Printer redirection -->
+            <param name="enable-printing">true</param>
+            <param name="printer-name">Browser Printer</param>
+
+            <!-- Multi-touch -->
+            <param name="enable-touch">true</param>
+
+            <!-- SFTP file upload overlay -->
+            <param name="enable-sftp">true</param>
+            <param name="sftp-hostname">host.docker.internal</param>
+            <param name="sftp-port">22</param>
+            <param name="sftp-username">YOUR_WINDOWS_USERNAME</param>
+            <param name="sftp-password">YOUR_WINDOWS_PASSWORD</param>
+            <param name="sftp-server-alive-interval">30</param>
+
+            <!-- Keyboard -->
+            <param name="server-layout">en-us-qwerty</param>
+
+            <!-- Session recording -->
+            <param name="recording-path">/recordings</param>
+            <param name="create-recording-path">true</param>
+            <param name="recording-name">${GUAC_DATE}-${GUAC_TIME}</param>
         </connection>
     </authorize>
 </user-mapping>

@@ -7,6 +7,8 @@ data/challenges.json
 data/apps.json
 .webui_secret_key
 guacamole-config/user-mapping.xml
+shared/
+recordings/
 bun.lockb
 *.tsbuildinfo
 next-env.d.ts
