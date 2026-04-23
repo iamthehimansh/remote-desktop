@@ -17,6 +17,16 @@ const nextConfig = {
       },
     ];
   },
+  async rewrites() {
+    // Proxy Guacamole through the dashboard so middleware can enforce auth first.
+    // (HTTP works here. WebSocket upgrade is handled by the custom server in `server/proxy.ts`.)
+    return [
+      {
+        source: "/guacamole/:path*",
+        destination: "http://localhost:8080/guacamole/:path*",
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
