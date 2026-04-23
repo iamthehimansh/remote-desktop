@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pi Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/htmx.org@2.0.3"></script>
+<style>body{background:#09090b}.mono{font-family:'JetBrains Mono',monospace}</style>
+</head>
+<body class="min-h-screen bg-zinc-950 text-zinc-100">
+<header class="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur px-6 h-14 flex items-center justify-between sticky top-0 z-10">
+  <div class="flex items-center gap-3">
+    <svg class="w-5 h-5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
+    <span class="font-mono text-sm">pi.himansh.in</span>
+    <span id="pi-status" class="text-xs text-emerald-500 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Live</span>
+  </div>
+  <nav class="flex items-center gap-1 text-sm">
+    <button class="tab-btn px-3 py-1.5 rounded hover:bg-zinc-800" data-tab="overview">Overview</button>
+    <button class="tab-btn px-3 py-1.5 rounded hover:bg-zinc-800" data-tab="apps">Apps</button>
+    <button class="tab-btn px-3 py-1.5 rounded hover:bg-zinc-800" data-tab="ports">Ports</button>
+    <button class="tab-btn px-3 py-1.5 rounded hover:bg-zinc-800" data-tab="terminal">Terminal</button>
+    <button class="tab-btn px-3 py-1.5 rounded hover:bg-zinc-800" data-tab="files">Files</button>
+    <button id="logout" class="ml-2 px-3 py-1.5 rounded text-red-400 hover:bg-red-500/10">Logout</button>
+  </nav>
+</header>
+
+<main class="p-6 max-w-7xl mx-auto">
+
+<!-- Overview -->
+<section class="tab-pane" data-tab="overview">
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+      <p class="text-xs uppercase tracking-wider text-zinc-500">CPU Load</p>
+      <p class="text-2xl mono font-semibold mt-1 text-blue-400" id="cpu">—</p>
+      <p class="text-xs text-zinc-400 mt-1">1m / 5m / 15m</p>
+    </div>
+    <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+      <p class="text-xs uppercase tracking-wider text-zinc-500">Memory</p>
+      <p class="text-2xl mono font-semibold mt-1 text-emerald-400" id="mem">—</p>
+      <p class="text-xs text-zinc-400 mt-1" id="mem-sub">—</p>
+    </div>
+    <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+      <p class="text-xs uppercase tracking-wider text-zinc-500">Temperature</p>
+      <p class="text-2xl mono font-semibold mt-1 text-amber-400" id="temp">—</p>
+      <p class="text-xs text-zinc-400 mt-1" id="uptime">—</p>
+    </div>
+    <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800 flex flex-col">
+      <p class="text-xs uppercase tracking-wider text-zinc-500">PC</p>
+      <p class="text-2xl mono font-semibold mt-1"><span id="pc-badge" class="text-zinc-500">—</span></p>
+      <button id="wake" class="mt-2 px-3 py-1.5 text-sm rounded bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed">Wake PC</button>
+    </div>
+  </div>
+
+  <div class="mt-4 p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+    <h2 class="font-semibold mb-3">Pi-hole</h2>
+    <div id="pihole" class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+      <div><p class="text-zinc-500 text-xs">Queries today</p><p class="mono text-xl" id="ph-q">—</p></div>
+      <div><p class="text-zinc-500 text-xs">Blocked</p><p class="mono text-xl text-red-400" id="ph-b">—</p></div>
+      <div><p class="text-zinc-500 text-xs">% Blocked</p><p class="mono text-xl" id="ph-p">—</p></div>
+      <div><p class="text-zinc-500 text-xs">Domains on lists</p><p class="mono text-xl" id="ph-d">—</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- Apps -->
+<section class="tab-pane hidden" data-tab="apps">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-semibold">Apps</h2>
+    <button id="new-app" class="px-3 py-1.5 text-sm rounded bg-blue-500 hover:bg-blue-600 text-white">+ Add app</button>
+  </div>
+  <div id="apps-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+</section>
+
+<!-- Ports -->
+<section class="tab-pane hidden" data-tab="ports">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-semibold">Port Forwards</h2>
+    <button id="new-port" class="px-3 py-1.5 text-sm rounded bg-blue-500 hover:bg-blue-600 text-white">+ Forward port</button>
+  </div>
+  <div id="ports-table" class="rounded-lg bg-zinc-900 border border-zinc-800 overflow-hidden">
+    <table class="w-full text-sm"><thead class="text-zinc-500 text-xs"><tr><th class="text-left p-3">Subdomain</th><th class="text-left p-3">Port</th><th class="text-left p-3">Created</th><th class="text-right p-3">Actions</th></tr></thead><tbody id="ports-tbody"></tbody></table>
+  </div>
+</section>
+
+<!-- Terminal -->
+<section class="tab-pane hidden" data-tab="terminal">
+  <div class="rounded-lg bg-black border border-zinc-800 overflow-hidden" style="height:calc(100vh - 180px)">
+    <iframe src="/terminal/" class="w-full h-full border-0"></iframe>
+  </div>
+  <p class="text-xs text-zinc-500 mt-2">Terminal is proxied from ttyd (localhost:{{ ttyd_port }}). Secure login prompt will appear on first use.</p>
+</section>
+
+<!-- Files -->
+<section class="tab-pane hidden" data-tab="files">
+  <div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
+    <div class="flex items-center gap-2 mb-3 text-sm">
+      <button id="files-up" class="px-2 py-1 rounded hover:bg-zinc-800">↑ Up</button>
+      <span id="files-path" class="mono text-zinc-400">/</span>
+      <div class="ml-auto flex gap-2">
+        <button id="files-mkdir" class="px-2 py-1 rounded hover:bg-zinc-800 text-zinc-400">+ Folder</button>
+        <label class="px-2 py-1 rounded hover:bg-zinc-800 text-zinc-400 cursor-pointer">
+          Upload<input id="files-upload" type="file" multiple class="hidden">
+        </label>
+      </div>
+    </div>
+    <table class="w-full text-sm"><tbody id="files-tbody"></tbody></table>
+  </div>
+</section>
+
+</main>
+
+<script>
+// Tabs
+document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+  const t = btn.dataset.tab;
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('hidden', p.dataset.tab !== t));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('bg-zinc-800', b === btn));
+  loadTab(t);
+}));
+document.querySelector('.tab-btn[data-tab=overview]').click();
+
+// Logout
+document.getElementById('logout').addEventListener('click', async () => {
+  await fetch('/api/logout', { method: 'POST' });
+  location.href = '/login';
+});
+
+// Wake PC
+document.getElementById('wake').addEventListener('click', async () => {
+  const btn = document.getElementById('wake');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  const r = await fetch('/api/wake-pc', { method: 'POST' });
+  btn.textContent = r.ok ? 'Magic packet sent ✓' : 'Failed';
+  setTimeout(() => { btn.disabled = false; btn.textContent = 'Wake PC'; }, 3000);
+});
+
+function fmtBytes(b){if(!b)return'0';const u=['B','KB','MB','GB','TB'];let i=0;while(b>=1024&&i<u.length-1){b/=1024;i++}return b.toFixed(1)+' '+u[i]}
+function fmtUptime(s){const d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);return d?`${d}d ${h}h ${m}m`:`${h}h ${m}m`}
+
+async function refreshOverview() {
+  try {
+    const r = await fetch('/api/stats'); const d = await r.json();
+    document.getElementById('cpu').textContent = d.cpu_load.map(x=>x.toFixed(2)).join(' / ');
+    document.getElementById('mem').textContent = `${fmtBytes(d.memory.used)} / ${fmtBytes(d.memory.total)}`;
+    document.getElementById('mem-sub').textContent = d.memory.usage.toFixed(1)+'%';
+    document.getElementById('temp').textContent = d.temp_c ? d.temp_c.toFixed(1)+'°C' : 'N/A';
+    document.getElementById('uptime').textContent = 'Up '+fmtUptime(d.uptime_sec);
+    const b = document.getElementById('pc-badge');
+    if (d.pc_online === true) { b.textContent='Online'; b.className='text-emerald-400'; }
+    else if (d.pc_online === false) { b.textContent='Offline'; b.className='text-zinc-500'; }
+    else b.textContent='—';
+  } catch(e){}
+  try {
+    const r = await fetch('/api/pihole'); const d = await r.json();
+    // v6 and v5 shape differs; try both
+    const q = d?.queries?.total ?? d?.dns_queries_today ?? '—';
+    const bl = d?.queries?.blocked ?? d?.ads_blocked_today ?? '—';
+    const p = d?.queries?.percent_blocked ?? d?.ads_percentage_today ?? '—';
+    const dom = d?.gravity?.domains_being_blocked ?? d?.domains_being_blocked ?? '—';
+    document.getElementById('ph-q').textContent = q;
+    document.getElementById('ph-b').textContent = bl;
+    document.getElementById('ph-p').textContent = (p==='—'?p:(+p).toFixed(1)+'%');
+    document.getElementById('ph-d').textContent = dom;
+  } catch(e){}
+}
+
+async function refreshApps() {
+  const r = await fetch('/api/apps'); const apps = await r.json();
+  const g = document.getElementById('apps-grid'); g.innerHTML='';
+  for (const a of apps) {
+    const card = document.createElement('div');
+    card.className = 'p-4 rounded-lg bg-zinc-900 border border-zinc-800';
+    card.innerHTML = `
+      <div class="flex items-start justify-between mb-2">
+        <h3 class="font-semibold">${a.name}</h3>
+        <span class="text-xs ${a.status==='running'?'text-emerald-400':'text-zinc-500'}">${a.status}</span>
+      </div>
+      <p class="text-xs text-zinc-500 mb-2">${a.subdomain}.himansh.in</p>
+      <p class="text-xs text-zinc-400 mb-3">${a.description||''}</p>
+      <div class="flex gap-2">
+        <a href="https://${a.subdomain}.himansh.in${a.path||'/'}" target="_blank" class="text-sm px-3 py-1.5 rounded bg-blue-500 hover:bg-blue-600 text-white flex-1 text-center">Open</a>
+        ${a.managed ? `<button data-del="${a.id}" class="text-sm px-3 py-1.5 rounded text-red-400 hover:bg-red-500/10">Delete</button>`:''}
+      </div>`;
+    g.appendChild(card);
+  }
+  g.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', async()=>{
+    if(!confirm('Delete this app?'))return;
+    await fetch('/api/apps/'+b.dataset.del,{method:'DELETE'});refreshApps();
+  }));
+}
+
+document.getElementById('new-app').addEventListener('click', async () => {
+  const name = prompt('App name?'); if (!name) return;
+  const subdomain = prompt('Subdomain (e.g. "nextcloud" for nextcloud.himansh.in)?');
+  if (!subdomain) return;
+  const port = prompt('Local port?'); if (!port) return;
+  const command = prompt('Start command (optional)') || '';
+  const r = await fetch('/api/apps',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,subdomain,port,command})});
+  if(!r.ok){alert((await r.json()).error||'Failed');return;}
+  refreshApps();
+});
+
+async function refreshPorts() {
+  const r = await fetch('/api/ports'); const ports = await r.json();
+  const t = document.getElementById('ports-tbody'); t.innerHTML='';
+  for (const p of ports) {
+    const tr = document.createElement('tr'); tr.className='border-t border-zinc-800';
+    tr.innerHTML = `
+      <td class="p-3"><a href="https://${p.hostname}" target="_blank" class="text-blue-400 hover:underline">${p.hostname}</a></td>
+      <td class="p-3 mono">${p.port}</td>
+      <td class="p-3 text-xs text-zinc-500">${new Date(p.createdAt).toLocaleDateString()}</td>
+      <td class="p-3 text-right"><button data-del="${p.id}" class="text-sm px-3 py-1.5 rounded text-red-400 hover:bg-red-500/10">Remove</button></td>`;
+    t.appendChild(tr);
+  }
+  t.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', async()=>{
+    await fetch('/api/ports/'+b.dataset.del,{method:'DELETE'});refreshPorts();
+  }));
+}
+
+document.getElementById('new-port').addEventListener('click', async () => {
+  const subdomain = prompt('Subdomain (e.g. "myapp" for myapp.himansh.in)?');
+  if (!subdomain) return;
+  const port = prompt('Local port?'); if (!port) return;
+  const r = await fetch('/api/ports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subdomain,port})});
+  if(!r.ok){alert((await r.json()).error||'Failed');return;}
+  refreshPorts();
+});
+
+let currentPath = '';
+async function refreshFiles() {
+  const r = await fetch('/api/files?path='+encodeURIComponent(currentPath));
+  const d = await r.json();
+  if (d.error) { alert(d.error); return; }
+  document.getElementById('files-path').textContent = '/'+(d.path||'');
+  const t = document.getElementById('files-tbody'); t.innerHTML='';
+  for (const item of d.items) {
+    const tr = document.createElement('tr'); tr.className='border-t border-zinc-800 hover:bg-zinc-800/50 cursor-pointer';
+    tr.innerHTML = `<td class="p-2">${item.type==='directory'?'📁':'📄'} ${item.name}</td><td class="p-2 text-xs text-zinc-500 text-right">${item.type==='file'?fmtBytes(item.size):''}</td>`;
+    tr.addEventListener('click', () => {
+      if (item.type==='directory') { currentPath = currentPath ? currentPath+'/'+item.name : item.name; refreshFiles(); }
+      else { window.open('/api/files?download=1&path='+encodeURIComponent((currentPath?currentPath+'/':'')+item.name)); }
+    });
+    t.appendChild(tr);
+  }
+}
+document.getElementById('files-up').addEventListener('click', () => {
+  if (!currentPath) return;
+  const parts = currentPath.split('/'); parts.pop(); currentPath = parts.join('/'); refreshFiles();
+});
+document.getElementById('files-mkdir').addEventListener('click', async () => {
+  const name = prompt('Folder name?'); if(!name)return;
+  await fetch('/api/files/mkdir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:currentPath+'/'+name})});
+  refreshFiles();
+});
+document.getElementById('files-upload').addEventListener('change', async (e) => {
+  const fd = new FormData(); fd.append('path', currentPath);
+  for (const f of e.target.files) fd.append('file', f);
+  await fetch('/api/files/upload',{method:'POST',body:fd});
+  refreshFiles();
+});
+
+function loadTab(t) {
+  if (t==='overview') refreshOverview();
+  if (t==='apps') refreshApps();
+  if (t==='ports') refreshPorts();
+  if (t==='files') refreshFiles();
+}
+
+// Auto-refresh overview
+setInterval(() => { if (!document.querySelector('[data-tab=overview]').classList.contains('hidden')) refreshOverview(); }, 5000);
+</script></body></html>

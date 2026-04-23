@@ -1,0 +1,6 @@
+flask==3.0.*
+gunicorn==22.*
+bcrypt==4.*
+pyjwt==2.*
+requests==2.*
+wakeonlan==3.*
