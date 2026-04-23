@@ -11,7 +11,13 @@ export const dynamic = "force-dynamic";
 // - If not logged in and prompt=silent: 302 back with ?error=login_required
 // - Else: 302 to /login?return=<this url>
 export async function GET(request: Request) {
-  const url = new URL(request.url);
+  // Build URL using the Host header so redirects stay on pc.himansh.in
+  // (otherwise Next.js can resolve request.url against localhost)
+  const host = request.headers.get("host") || "pc.himansh.in";
+  const forwardedProto = request.headers.get("x-forwarded-proto");
+  const proto = forwardedProto || (host.startsWith("localhost") ? "http" : "https");
+  const reqUrl = new URL(request.url);
+  const url = new URL(reqUrl.pathname + reqUrl.search, `${proto}://${host}`);
   const clientId = url.searchParams.get("client_id") || "";
   const redirectUri = url.searchParams.get("redirect_uri") || "";
   const state = url.searchParams.get("state") || "";
@@ -47,7 +53,7 @@ export async function GET(request: Request) {
   }
 
   // Interactive login — redirect to dashboard login, come back here after
-  const loginUrl = new URL("/login", request.url);
+  const loginUrl = new URL("/login", `${proto}://${host}`);
   loginUrl.searchParams.set("return", url.pathname + url.search);
   return NextResponse.redirect(loginUrl);
 }

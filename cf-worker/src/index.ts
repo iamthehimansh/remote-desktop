@@ -146,7 +146,10 @@ async function handleCallbackPost(req: Request, env: Env, appId: string): Promis
     },
     body: JSON.stringify({ code, redirectUri }),
   });
-  if (!res.ok) return new Response(JSON.stringify({ error: "exchange_failed" }), { status: 502 });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    return new Response(JSON.stringify({ error: "exchange_failed", status: res.status, detail: detail.slice(0, 300) }), { status: 502 });
+  }
 
   const data = (await res.json()) as { access_token: string };
 

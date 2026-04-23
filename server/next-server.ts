@@ -25,6 +25,8 @@ try {
   }
 } catch {}
 
+// Default to production mode for `bun run start`. `bun run dev` sets NODE_ENV=development.
+if (!process.env.NODE_ENV) process.env.NODE_ENV = "production";
 const dev = process.env.NODE_ENV !== "production";
 const port = Number(process.env.PORT || 3005);
 const JWT_SECRET = process.env.JWT_SECRET || "";
@@ -103,12 +105,9 @@ app.prepare().then(() => {
       return;
     }
 
-    // Let Next.js handle HMR WebSockets in dev
-    // @ts-ignore
-    if (app.getUpgradeHandler) {
-      // @ts-ignore
-      app.getUpgradeHandler()(req, socket, head);
-    }
+    // Production: we don't serve any other WebSockets here. Reject cleanly.
+    // Dev: Next.js HMR uses its own port; nothing to forward here either.
+    try { socket.destroy(); } catch {}
   });
 
   server.listen(port, () => {

@@ -1,0 +1,4 @@
+$ node --import tsx server/next-server.ts
+> Dashboard ready on http://localhost:3005 (with Guacamole proxy)
+(node:35564) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
