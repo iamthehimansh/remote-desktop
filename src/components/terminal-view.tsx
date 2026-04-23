@@ -9,11 +9,10 @@ import "@xterm/xterm/css/xterm.css";
 interface TerminalViewProps {
   shell: string;
   tabId?: string;
+  sessionId: string; // server sessionId — required for cross-device persistence
 }
 
-const STORAGE_PREFIX = "terminal-session-";
-
-export default function TerminalView({ shell, tabId }: TerminalViewProps) {
+export default function TerminalView({ shell, tabId, sessionId }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<Terminal | null>(null);
@@ -22,7 +21,7 @@ export default function TerminalView({ shell, tabId }: TerminalViewProps) {
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container || !sessionId) return;
     disposedRef.current = false;
 
     const term = new Terminal({
@@ -87,7 +86,7 @@ export default function TerminalView({ shell, tabId }: TerminalViewProps) {
     window.addEventListener("focus", handleVisible);
     document.addEventListener("visibilitychange", handleVisible);
 
-    // Listen for TTL change requests from the tab bar
+    // Listen for TTL change requests
     const handleTTL = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.tabId !== tabId) return;
@@ -114,14 +113,9 @@ export default function TerminalView({ shell, tabId }: TerminalViewProps) {
 
       if (disposedRef.current) return;
 
-      // Check for existing sessionId to reattach
-      const storageKey = tabId ? STORAGE_PREFIX + tabId : null;
-      const existingSessionId = storageKey ? localStorage.getItem(storageKey) : null;
-      const sessionParam = existingSessionId ? `&sessionId=${encodeURIComponent(existingSessionId)}` : "";
-
       const url = isLocalhost
-        ? `ws://localhost:3006?shell=${shell}${sessionParam}`
-        : `wss://${window.location.host}/ws/ssh?shell=${shell}${tokenParam}${sessionParam}`;
+        ? `ws://localhost:3006?shell=${shell}&sessionId=${encodeURIComponent(sessionId)}`
+        : `wss://${window.location.host}/ws/ssh?shell=${shell}${tokenParam}&sessionId=${encodeURIComponent(sessionId)}`;
 
       const ws = new WebSocket(url);
       wsRef.current = ws;
@@ -137,15 +131,6 @@ export default function TerminalView({ shell, tabId }: TerminalViewProps) {
             term.write(msg.data);
           } else if (msg.type === "exit") {
             term.write(`\r\n\x1b[33mProcess exited with code ${msg.code}\x1b[0m\r\n`);
-            // Clear stored sessionId since it's dead
-            if (storageKey) localStorage.removeItem(storageKey);
-          } else if (msg.type === "session") {
-            // Server sent us our session id — remember it
-            if (storageKey) localStorage.setItem(storageKey, msg.id);
-            // Emit a custom event so the tab bar / settings can pick up the ttlMs
-            window.dispatchEvent(new CustomEvent("terminal-session", {
-              detail: { tabId, sessionId: msg.id, ttlMs: msg.ttlMs },
-            }));
           }
         } catch {}
       };
@@ -178,7 +163,7 @@ export default function TerminalView({ shell, tabId }: TerminalViewProps) {
       fitRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shell, tabId]);
+  }, [shell, sessionId]);
 
   return <div ref={containerRef} className="h-full w-full" style={{ minHeight: "200px" }} />;
 }

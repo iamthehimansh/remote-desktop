@@ -2,13 +2,13 @@
 
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { usePersistentSessions } from "@/contexts/persistent-sessions";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { Plus, X, Terminal as TerminalIcon, ChevronDown, Clock, Settings } from "lucide-react";
+import { Plus, X, Terminal as TerminalIcon, ChevronDown, Clock, Settings, Loader2 } from "lucide-react";
 
 const TerminalView = dynamic(() => import("@/components/terminal-view"), { ssr: false });
 
@@ -40,59 +40,65 @@ function formatTTL(ttl: number | "unlimited" | undefined): string {
 
 export function PersistentTerminalHost() {
   const pathname = usePathname();
-  const { terminalTabs, setTerminalTabs, activeTabId, setActiveTabId } = usePersistentSessions();
-
-  // tabId -> { sessionId, ttlMs }
-  const [sessionInfo, setSessionInfo] = useState<Record<string, { sessionId: string; ttlMs: number | "unlimited" }>>({});
-  const wsRefForTab = useRef<Record<string, WebSocket | null>>({});
+  const {
+    terminalTabs, setTerminalTabs, activeTabId, setActiveTabId,
+    refreshSessions, sessionsLoaded,
+  } = usePersistentSessions();
+  const [creating, setCreating] = useState(false);
 
   const visible = pathname === "/dashboard/terminal";
 
-  // Listen for session events from TerminalView
+  // Refresh list whenever user navigates to the terminal page
+  // so other devices see sessions created elsewhere
   useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (!detail?.tabId) return;
-      setSessionInfo((prev) => ({ ...prev, [detail.tabId]: { sessionId: detail.sessionId, ttlMs: detail.ttlMs } }));
-    };
-    window.addEventListener("terminal-session", handler);
-    return () => window.removeEventListener("terminal-session", handler);
-  }, []);
+    if (visible) refreshSessions();
+  }, [visible, refreshSessions]);
 
-  const addTab = (shell: string) => {
-    const label = SHELLS.find((s) => s.value === shell)?.label || shell;
-    const id = String(Date.now());
-    setTerminalTabs((prev) => [...prev, { id, shell, title: label }]);
-    setActiveTabId(id);
+  // Periodic refresh to pick up sessions from other devices / server TTL expirations
+  useEffect(() => {
+    const interval = setInterval(() => refreshSessions(), 10000);
+    return () => clearInterval(interval);
+  }, [refreshSessions]);
+
+  const addTab = async (shell: string) => {
+    setCreating(true);
+    try {
+      const label = SHELLS.find((s) => s.value === shell)?.label || shell;
+      const res = await fetch("/api/terminal/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shell, title: label }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const newTab = { id: data.id, shell: data.shell, title: data.title, ttlMs: data.ttlMs };
+        setTerminalTabs((prev) => [...prev, newTab]);
+        setActiveTabId(data.id);
+      }
+    } catch {}
+    setCreating(false);
   };
 
-  const closeTab = (id: string) => {
-    // Tell server to destroy the session too
-    const info = sessionInfo[id];
-    if (info?.sessionId) {
-      const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-      const base = isLocalhost ? "http://localhost:3006" : `https://${window.location.host}/ws-api`;
-      fetch(`${base}/sessions/${info.sessionId}`, { method: "DELETE" }).catch(() => {});
-    }
-    localStorage.removeItem(`terminal-session-${id}`);
-
+  const closeTab = async (id: string) => {
+    try {
+      await fetch(`/api/terminal/sessions/${id}`, { method: "DELETE" });
+    } catch {}
     setTerminalTabs((prev) => {
       const next = prev.filter((t) => t.id !== id);
-      if (next.length === 0) return prev;
-      if (activeTabId === id) setActiveTabId(next[next.length - 1].id);
+      if (activeTabId === id) setActiveTabId(next[next.length - 1]?.id || "");
       return next;
     });
   };
 
-  const updateTTL = (tabId: string, ttlMs: number | "unlimited") => {
-    const info = sessionInfo[tabId];
-    if (!info?.sessionId) return;
-    // Send via WebSocket if possible (simpler since we already have it open)
-    // Use custom event to ask the TerminalView to send the ttl message
-    window.dispatchEvent(new CustomEvent("terminal-set-ttl", {
-      detail: { tabId, ttlMs },
-    }));
-    setSessionInfo((prev) => ({ ...prev, [tabId]: { ...prev[tabId], ttlMs } }));
+  const updateTTL = async (tabId: string, ttlMs: number | "unlimited") => {
+    try {
+      await fetch(`/api/terminal/sessions/${tabId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ttlMs }),
+      });
+    } catch {}
+    setTerminalTabs((prev) => prev.map((t) => t.id === tabId ? { ...t, ttlMs } : t));
   };
 
   return (
@@ -103,69 +109,60 @@ export function PersistentTerminalHost() {
         pointerEvents: visible ? "auto" : "none",
         zIndex: visible ? 10 : -1,
       }}
-      // Block focus stealing when not visible
       {...(!visible && { inert: "" as any })}
     >
       {/* Tab bar */}
-      <div className="flex items-center bg-surface border-b border-border px-2 h-9 shrink-0">
-        {terminalTabs.map((tab) => {
-          const info = sessionInfo[tab.id];
-          return (
-            <div
-              key={tab.id}
-              className={`flex items-center gap-1.5 px-3 h-full text-xs border-r border-border transition-colors cursor-pointer ${
-                activeTabId === tab.id
-                  ? "bg-background text-text-primary"
-                  : "text-text-secondary hover:text-text-primary hover:bg-elevated/50"
-              }`}
-              onClick={() => setActiveTabId(tab.id)}
-            >
-              <TerminalIcon className="h-3 w-3" />
-              <span>{tab.title}</span>
-              {info?.ttlMs !== undefined && (
-                <span className="ml-1 px-1.5 rounded bg-elevated text-[10px] font-mono" title={`TTL: ${formatTTL(info.ttlMs)}`}>
-                  {formatTTL(info.ttlMs)}
-                </span>
-              )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    onClick={(e) => e.stopPropagation()}
-                    className="ml-0.5 p-0.5 hover:bg-elevated rounded"
+      <div className="flex items-center bg-surface border-b border-border px-2 h-9 shrink-0 overflow-x-auto">
+        {terminalTabs.map((tab) => (
+          <div
+            key={tab.id}
+            className={`flex items-center gap-1.5 px-3 h-full text-xs border-r border-border transition-colors cursor-pointer shrink-0 ${
+              activeTabId === tab.id
+                ? "bg-background text-text-primary"
+                : "text-text-secondary hover:text-text-primary hover:bg-elevated/50"
+            }`}
+            onClick={() => setActiveTabId(tab.id)}
+          >
+            <TerminalIcon className="h-3 w-3" />
+            <span>{tab.title}</span>
+            {tab.ttlMs !== undefined && (
+              <span className="ml-1 px-1.5 rounded bg-elevated text-[10px] font-mono" title={`Session TTL: ${formatTTL(tab.ttlMs)}`}>
+                {formatTTL(tab.ttlMs)}
+              </span>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button onClick={(e) => e.stopPropagation()} className="ml-0.5 p-0.5 hover:bg-elevated rounded">
+                  <Settings className="h-3 w-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-surface border-border">
+                <DropdownMenuLabel className="text-xs">Session TTL</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {TTL_OPTIONS.map((opt) => (
+                  <DropdownMenuItem
+                    key={String(opt.value)}
+                    onClick={() => updateTTL(tab.id, opt.value)}
+                    className="text-text-primary focus:bg-elevated text-xs"
                   >
-                    <Settings className="h-3 w-3" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-surface border-border">
-                  <DropdownMenuLabel className="text-xs">Session TTL</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {TTL_OPTIONS.map((opt) => (
-                    <DropdownMenuItem
-                      key={String(opt.value)}
-                      onClick={() => updateTTL(tab.id, opt.value)}
-                      className="text-text-primary focus:bg-elevated text-xs"
-                    >
-                      <Clock className="h-3 w-3 mr-2" />
-                      {opt.label}
-                      {info?.ttlMs === opt.value && <span className="ml-auto text-success">✓</span>}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              {terminalTabs.length > 1 && (
-                <X
-                  className="h-3 w-3 ml-1 hover:text-danger"
-                  onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
-                />
-              )}
-            </div>
-          );
-        })}
+                    <Clock className="h-3 w-3 mr-2" />
+                    {opt.label}
+                    {tab.ttlMs === opt.value && <span className="ml-auto text-success">✓</span>}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <X
+              className="h-3 w-3 ml-1 hover:text-danger"
+              onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
+            />
+          </div>
+        ))}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-full px-2 text-text-secondary hover:text-text-primary">
-              <Plus className="h-3.5 w-3.5" />
+            <Button variant="ghost" size="sm" disabled={creating} className="h-full px-2 text-text-secondary hover:text-text-primary shrink-0">
+              {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
               <ChevronDown className="h-3 w-3 ml-0.5" />
             </Button>
           </DropdownMenuTrigger>
@@ -181,9 +178,13 @@ export function PersistentTerminalHost() {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {sessionsLoaded && terminalTabs.length === 0 && (
+          <span className="ml-2 text-xs text-text-secondary">No sessions. Click + to start one.</span>
+        )}
       </div>
 
-      {/* Terminal views — all mounted, only active one shown */}
+      {/* Terminal views */}
       <div className="flex-1 relative bg-background">
         {terminalTabs.map((tab) => (
           <div
@@ -191,7 +192,7 @@ export function PersistentTerminalHost() {
             className="absolute inset-0"
             style={{ display: tab.id === activeTabId ? "block" : "none" }}
           >
-            <TerminalView shell={tab.shell} tabId={tab.id} />
+            <TerminalView shell={tab.shell} tabId={tab.id} sessionId={tab.id} />
           </div>
         ))}
       </div>

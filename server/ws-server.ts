@@ -52,6 +52,7 @@ const SHELLS: Record<string, { command: string; args: string[] }> = {
 interface SessionMeta {
   id: string;
   shell: string;
+  title: string;
   createdAt: string;
   ttlMs: number | "unlimited";
   lastActive: string;
@@ -76,6 +77,7 @@ function updateMeta(id: string, patch: Partial<SessionMeta>) {
 interface Session {
   id: string;
   shell: string;
+  title: string;
   pty: any;
   logStream: WriteStream;
   logPath: string;
@@ -91,9 +93,17 @@ const sessions = new Map<string, Session>();
 
 function logPathFor(id: string) { return join(SESSIONS_DIR, `${id}.log`); }
 
-function createSession(shell: string, sessionId?: string): Session {
+const SHELL_TITLES: Record<string, string> = {
+  powershell: "PowerShell",
+  "powershell-admin": "PowerShell (Admin)",
+  cmd: "CMD",
+  wsl: "WSL",
+};
+
+function createSession(shell: string, sessionId?: string, title?: string): Session {
   const id = sessionId || randomBytes(8).toString("hex");
   const shellConfig = SHELLS[shell] || SHELLS.powershell;
+  const sessionTitle = title || SHELL_TITLES[shell] || shell;
 
   const ptyProcess = pty.spawn(shellConfig.command, shellConfig.args, {
     name: "xterm-256color",
@@ -111,6 +121,7 @@ function createSession(shell: string, sessionId?: string): Session {
   const session: Session = {
     id,
     shell,
+    title: sessionTitle,
     pty: ptyProcess,
     logStream,
     logPath,
@@ -155,6 +166,7 @@ function createSession(shell: string, sessionId?: string): Session {
   meta[id] = {
     id,
     shell,
+    title: sessionTitle,
     createdAt: new Date().toISOString(),
     ttlMs: DEFAULT_TTL_MS,
     lastActive: new Date().toISOString(),
@@ -264,6 +276,7 @@ const httpServer = createServer((req, res) => {
     const list = Array.from(sessions.values()).map((s) => ({
       id: s.id,
       shell: s.shell,
+      title: s.title,
       createdAt: new Date(s.createdAt).toISOString(),
       connected: s.clients.size,
       ttlMs: s.ttlMs,
@@ -274,14 +287,37 @@ const httpServer = createServer((req, res) => {
     return;
   }
 
+  // Create a new session via HTTP (returns the id; attach via WebSocket after)
+  if (url.pathname === "/sessions" && req.method === "POST") {
+    let body = "";
+    req.on("data", (c) => { body += c; });
+    req.on("end", () => {
+      try {
+        const { shell, title } = JSON.parse(body || "{}");
+        const s = createSession(shell || "powershell", undefined, title);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ id: s.id, shell: s.shell, title: s.title, ttlMs: s.ttlMs }));
+      } catch {
+        res.writeHead(400); res.end();
+      }
+    });
+    return;
+  }
+
   if (url.pathname.startsWith("/sessions/") && req.method === "PATCH") {
     const id = url.pathname.split("/")[2];
     let body = "";
     req.on("data", (c) => { body += c; });
     req.on("end", () => {
       try {
-        const { ttlMs } = JSON.parse(body);
-        setTTL(id, ttlMs);
+        const patch = JSON.parse(body);
+        const s = sessions.get(id);
+        if (!s) { res.writeHead(404); res.end(); return; }
+        if (patch.ttlMs !== undefined) setTTL(id, patch.ttlMs);
+        if (patch.title !== undefined) {
+          s.title = String(patch.title);
+          updateMeta(id, { title: s.title });
+        }
         res.writeHead(200); res.end(JSON.stringify({ success: true }));
       } catch {
         res.writeHead(400); res.end();
