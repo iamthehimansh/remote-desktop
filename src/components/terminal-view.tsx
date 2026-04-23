@@ -11,6 +11,8 @@ interface TerminalViewProps {
   tabId?: string;
 }
 
+const STORAGE_PREFIX = "terminal-session-";
+
 export default function TerminalView({ shell, tabId }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -57,7 +59,6 @@ export default function TerminalView({ shell, tabId }: TerminalViewProps) {
       if (!disposedRef.current) try { fitAddon.fit(); } catch {}
     }, 100);
 
-    // Terminal input handler
     term.onData((data) => {
       const socket = wsRef.current;
       if (socket && socket.readyState === WebSocket.OPEN) {
@@ -65,10 +66,8 @@ export default function TerminalView({ shell, tabId }: TerminalViewProps) {
       }
     });
 
-    // Resize observer — also refits when container becomes visible again
     const observer = new ResizeObserver(() => {
       if (disposedRef.current) return;
-      // Only fit if container has real dimensions (not hidden)
       if (container.offsetWidth === 0 || container.offsetHeight === 0) return;
       try {
         fitAddon.fit();
@@ -80,7 +79,6 @@ export default function TerminalView({ shell, tabId }: TerminalViewProps) {
     });
     observer.observe(container);
 
-    // Also refit on window focus/visibility changes
     const handleVisible = () => {
       if (!disposedRef.current && container.offsetWidth > 0) {
         try { fitAddon.fit(); } catch {}
@@ -89,7 +87,17 @@ export default function TerminalView({ shell, tabId }: TerminalViewProps) {
     window.addEventListener("focus", handleVisible);
     document.addEventListener("visibilitychange", handleVisible);
 
-    // Connect WebSocket
+    // Listen for TTL change requests from the tab bar
+    const handleTTL = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.tabId !== tabId) return;
+      const socket = wsRef.current;
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "ttl", ttlMs: detail.ttlMs }));
+      }
+    };
+    window.addEventListener("terminal-set-ttl", handleTTL);
+
     const connect = async () => {
       const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
@@ -106,9 +114,14 @@ export default function TerminalView({ shell, tabId }: TerminalViewProps) {
 
       if (disposedRef.current) return;
 
+      // Check for existing sessionId to reattach
+      const storageKey = tabId ? STORAGE_PREFIX + tabId : null;
+      const existingSessionId = storageKey ? localStorage.getItem(storageKey) : null;
+      const sessionParam = existingSessionId ? `&sessionId=${encodeURIComponent(existingSessionId)}` : "";
+
       const url = isLocalhost
-        ? `ws://localhost:3006?shell=${shell}`
-        : `wss://${window.location.host}/ws/ssh?shell=${shell}${tokenParam}`;
+        ? `ws://localhost:3006?shell=${shell}${sessionParam}`
+        : `wss://${window.location.host}/ws/ssh?shell=${shell}${tokenParam}${sessionParam}`;
 
       const ws = new WebSocket(url);
       wsRef.current = ws;
@@ -124,6 +137,15 @@ export default function TerminalView({ shell, tabId }: TerminalViewProps) {
             term.write(msg.data);
           } else if (msg.type === "exit") {
             term.write(`\r\n\x1b[33mProcess exited with code ${msg.code}\x1b[0m\r\n`);
+            // Clear stored sessionId since it's dead
+            if (storageKey) localStorage.removeItem(storageKey);
+          } else if (msg.type === "session") {
+            // Server sent us our session id — remember it
+            if (storageKey) localStorage.setItem(storageKey, msg.id);
+            // Emit a custom event so the tab bar / settings can pick up the ttlMs
+            window.dispatchEvent(new CustomEvent("terminal-session", {
+              detail: { tabId, sessionId: msg.id, ttlMs: msg.ttlMs },
+            }));
           }
         } catch {}
       };
@@ -148,6 +170,7 @@ export default function TerminalView({ shell, tabId }: TerminalViewProps) {
       observer.disconnect();
       window.removeEventListener("focus", handleVisible);
       document.removeEventListener("visibilitychange", handleVisible);
+      window.removeEventListener("terminal-set-ttl", handleTTL);
       wsRef.current?.close();
       term.dispose();
       wsRef.current = null;

@@ -1,10 +1,11 @@
-import { readFileSync } from "fs";
-import { resolve } from "path";
+import { readFileSync, writeFileSync, createWriteStream, createReadStream, unlinkSync, existsSync, mkdirSync, readdirSync, statSync, WriteStream } from "fs";
+import { resolve, join } from "path";
 import { WebSocketServer, WebSocket } from "ws";
 import { verify } from "jsonwebtoken";
 import { parse as parseCookie } from "cookie";
+import { randomBytes } from "crypto";
 
-// Load .env.local manually (tsx/node doesn't auto-load it like Bun)
+// Load .env.local manually (tsx/node doesn't auto-load it like Bun does)
 try {
   const envPath = resolve(process.cwd(), ".env.local");
   const envContent = readFileSync(envPath, "utf-8");
@@ -21,25 +22,25 @@ try {
   }
 } catch {}
 
-// node-pty is a native module — require() works better than import for it
-const pty = require("node-pty");
-
 // Prevent node-pty socket errors from crashing the process
 process.on("uncaughtException", (err: any) => {
-  if (err.code === "ERR_SOCKET_CLOSED" || err.message?.includes("Socket is closed")) {
-    // Expected when PTY is killed while still writing
-    return;
-  }
+  if (err.code === "ERR_SOCKET_CLOSED" || err.message?.includes("Socket is closed")) return;
   console.error("Uncaught exception:", err);
 });
 
+// node-pty is a native module — require() works better than import for it
+const pty = require("node-pty");
+
 const PORT = 3006;
 const JWT_SECRET = process.env.JWT_SECRET || "";
+const SESSIONS_DIR = resolve(process.cwd(), "data/terminal-sessions");
+const METADATA_PATH = join(SESSIONS_DIR, "sessions.json");
+const DEFAULT_TTL_MS = 30 * 60 * 1000; // 30 min
+
+if (!existsSync(SESSIONS_DIR)) mkdirSync(SESSIONS_DIR, { recursive: true });
 
 console.log(`JWT_SECRET loaded: ${JWT_SECRET ? "yes (" + JWT_SECRET.length + " chars)" : "NO - auth will fail!"}`);
 
-// When the WS server runs elevated (via start-dashboard.bat running as admin),
-// ALL spawned shells inherit admin privileges automatically.
 const SHELLS: Record<string, { command: string; args: string[] }> = {
   powershell: { command: "powershell.exe", args: [] },
   "powershell-admin": { command: "powershell.exe", args: ["-ExecutionPolicy", "Bypass"] },
@@ -47,77 +48,53 @@ const SHELLS: Record<string, { command: string; args: string[] }> = {
   wsl: { command: "wsl.exe", args: [] },
 };
 
-function verifyAuth(req: any): boolean {
-  // Allow localhost connections (already behind app auth)
-  const origin = req.headers.origin || "";
-  const host = req.headers.host || "";
-  if (host.startsWith("localhost") || host.startsWith("127.0.0.1") ||
-      origin.includes("localhost") || origin.includes("127.0.0.1")) {
-    console.log("AUTH: Localhost connection, allowing");
-    return true;
-  }
+// ---------- Session metadata persistence ----------
+interface SessionMeta {
+  id: string;
+  shell: string;
+  createdAt: string;
+  ttlMs: number | "unlimited";
+  lastActive: string;
+}
 
-  // Check if request came through Cloudflare Access (already authenticated)
-  const cfHeader = req.headers["cf-access-authenticated-user-email"];
-  if (cfHeader) {
-    console.log(`AUTH: Cloudflare Access user: ${cfHeader}`);
-    return true;
-  }
-
-  // Check for token in query param (production - tunnel may not forward cookies)
-  const url = new URL(req.url || "/", `http://localhost:${PORT}`);
-  const queryToken = url.searchParams.get("token");
-  if (queryToken && JWT_SECRET) {
-    try {
-      verify(queryToken, JWT_SECRET);
-      console.log("AUTH: Query param JWT verified OK");
-      return true;
-    } catch (err: any) {
-      console.log("AUTH: Query param JWT failed:", err.message);
-    }
-  }
-
-  // Check cookie
-  const cookieHeader = req.headers.cookie;
-  if (!cookieHeader || !JWT_SECRET) {
-    console.log("AUTH: No cookie/token or JWT_SECRET");
-    return false;
-  }
-
-  try {
-    const cookies = parseCookie(cookieHeader);
-    const token = cookies["session"];
-    if (!token) {
-      console.log("AUTH: No 'session' cookie found");
-      return false;
-    }
-    verify(token, JWT_SECRET);
-    console.log("AUTH: JWT verified OK");
-    return true;
-  } catch (err: any) {
-    console.log("AUTH: JWT verification failed:", err.message);
-    return false;
+function readMetadata(): Record<string, SessionMeta> {
+  if (!existsSync(METADATA_PATH)) return {};
+  try { return JSON.parse(readFileSync(METADATA_PATH, "utf-8")); } catch { return {}; }
+}
+function writeMetadata(data: Record<string, SessionMeta>) {
+  writeFileSync(METADATA_PATH, JSON.stringify(data, null, 2));
+}
+function updateMeta(id: string, patch: Partial<SessionMeta>) {
+  const meta = readMetadata();
+  if (meta[id]) {
+    meta[id] = { ...meta[id], ...patch };
+    writeMetadata(meta);
   }
 }
 
-const wss = new WebSocketServer({ port: PORT });
+// ---------- Live session state ----------
+interface Session {
+  id: string;
+  shell: string;
+  pty: any;
+  logStream: WriteStream;
+  logPath: string;
+  clients: Set<WebSocket>;
+  ttlTimer: NodeJS.Timeout | null;
+  ttlMs: number | "unlimited";
+  createdAt: number;
+  cols: number;
+  rows: number;
+}
 
-console.log(`Terminal WebSocket server listening on :${PORT}`);
+const sessions = new Map<string, Session>();
 
-wss.on("connection", (ws: WebSocket, req) => {
-  // Auth check
-  if (!verifyAuth(req)) {
-    console.log("AUTH: Rejecting connection");
-    ws.close(4001, "Unauthorized");
-    return;
-  }
+function logPathFor(id: string) { return join(SESSIONS_DIR, `${id}.log`); }
 
-  // Parse shell selection from query string
-  const url = new URL(req.url || "/", `http://localhost:${PORT}`);
-  const shellName = url.searchParams.get("shell") || "powershell";
-  const shellConfig = SHELLS[shellName] || SHELLS.powershell;
+function createSession(shell: string, sessionId?: string): Session {
+  const id = sessionId || randomBytes(8).toString("hex");
+  const shellConfig = SHELLS[shell] || SHELLS.powershell;
 
-  // Spawn PTY
   const ptyProcess = pty.spawn(shellConfig.command, shellConfig.args, {
     name: "xterm-256color",
     cols: 80,
@@ -128,54 +105,275 @@ wss.on("connection", (ws: WebSocket, req) => {
     conptyInheritCursor: false,
   });
 
-  console.log(`PTY spawned: ${shellConfig.command} (pid: ${ptyProcess.pid})`);
+  const logPath = logPathFor(id);
+  const logStream = createWriteStream(logPath, { flags: "a" });
 
-  // PTY output -> WebSocket
+  const session: Session = {
+    id,
+    shell,
+    pty: ptyProcess,
+    logStream,
+    logPath,
+    clients: new Set(),
+    ttlTimer: null,
+    ttlMs: DEFAULT_TTL_MS,
+    createdAt: Date.now(),
+    cols: 80,
+    rows: 24,
+  };
+
+  console.log(`[${id}] PTY spawned: ${shellConfig.command} (pid: ${ptyProcess.pid})`);
+
+  // PTY output -> log file + all connected clients
   ptyProcess.onData((data: string) => {
     try {
-      if (ws.readyState === WebSocket.OPEN) {
-        console.log(`OUTPUT: ${JSON.stringify(data).slice(0, 80)}`);
-        ws.send(JSON.stringify({ type: "output", data }));
+      logStream.write(data);
+      for (const ws of session.clients) {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "output", data }));
+        }
       }
     } catch {}
   });
 
-  // PTY exit -> WebSocket
   ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
-    try {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "exit", code: exitCode }));
-        ws.close();
-      }
-    } catch {}
+    console.log(`[${id}] PTY exited with code ${exitCode}`);
+    for (const ws of session.clients) {
+      try {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "exit", code: exitCode }));
+        }
+      } catch {}
+    }
+    destroySession(id);
   });
 
-  // WebSocket messages -> PTY
+  sessions.set(id, session);
+
+  // Save metadata
+  const meta = readMetadata();
+  meta[id] = {
+    id,
+    shell,
+    createdAt: new Date().toISOString(),
+    ttlMs: DEFAULT_TTL_MS,
+    lastActive: new Date().toISOString(),
+  };
+  writeMetadata(meta);
+
+  return session;
+}
+
+function destroySession(id: string) {
+  const s = sessions.get(id);
+  if (!s) return;
+  console.log(`[${id}] Destroying session`);
+
+  if (s.ttlTimer) clearTimeout(s.ttlTimer);
+  try { s.pty.kill(); } catch {}
+  try { s.logStream.end(); } catch {}
+  try { if (existsSync(s.logPath)) unlinkSync(s.logPath); } catch {}
+
+  for (const ws of s.clients) {
+    try { ws.close(); } catch {}
+  }
+
+  sessions.delete(id);
+
+  const meta = readMetadata();
+  delete meta[id];
+  writeMetadata(meta);
+}
+
+function startTTL(session: Session) {
+  if (session.ttlTimer) clearTimeout(session.ttlTimer);
+  if (session.ttlMs === "unlimited") return;
+
+  session.ttlTimer = setTimeout(() => {
+    console.log(`[${session.id}] TTL expired, destroying session`);
+    destroySession(session.id);
+  }, session.ttlMs);
+}
+
+function cancelTTL(session: Session) {
+  if (session.ttlTimer) {
+    clearTimeout(session.ttlTimer);
+    session.ttlTimer = null;
+  }
+}
+
+export function setTTL(id: string, ttlMs: number | "unlimited") {
+  const s = sessions.get(id);
+  if (!s) return;
+  s.ttlMs = ttlMs;
+  updateMeta(id, { ttlMs });
+  // If no clients connected, restart TTL with new value
+  if (s.clients.size === 0) {
+    cancelTTL(s);
+    startTTL(s);
+  }
+}
+
+// ---------- Auth ----------
+function verifyAuth(req: any): boolean {
+  const origin = req.headers.origin || "";
+  const host = req.headers.host || "";
+  if (host.startsWith("localhost") || host.startsWith("127.0.0.1") ||
+      origin.includes("localhost") || origin.includes("127.0.0.1")) {
+    return true;
+  }
+
+  const cfHeader = req.headers["cf-access-authenticated-user-email"];
+  if (cfHeader) return true;
+
+  const url = new URL(req.url || "/", `http://localhost:${PORT}`);
+  const queryToken = url.searchParams.get("token");
+  if (queryToken && JWT_SECRET) {
+    try { verify(queryToken, JWT_SECRET); return true; } catch {}
+  }
+
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader || !JWT_SECRET) return false;
+  try {
+    const cookies = parseCookie(cookieHeader);
+    const token = cookies["session"];
+    if (!token) return false;
+    verify(token, JWT_SECRET);
+    return true;
+  } catch { return false; }
+}
+
+// ---------- HTTP control endpoints ----------
+import { createServer } from "http";
+
+const httpServer = createServer((req, res) => {
+  // Only allow localhost (dashboard talks to us over localhost)
+  const host = req.headers.host || "";
+  if (!host.startsWith("localhost") && !host.startsWith("127.0.0.1")) {
+    res.writeHead(403); res.end(); return;
+  }
+
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") { res.writeHead(200); res.end(); return; }
+
+  const url = new URL(req.url || "/", `http://${host}`);
+
+  if (url.pathname === "/sessions" && req.method === "GET") {
+    const list = Array.from(sessions.values()).map((s) => ({
+      id: s.id,
+      shell: s.shell,
+      createdAt: new Date(s.createdAt).toISOString(),
+      connected: s.clients.size,
+      ttlMs: s.ttlMs,
+      hasTTLRunning: !!s.ttlTimer,
+    }));
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ sessions: list }));
+    return;
+  }
+
+  if (url.pathname.startsWith("/sessions/") && req.method === "PATCH") {
+    const id = url.pathname.split("/")[2];
+    let body = "";
+    req.on("data", (c) => { body += c; });
+    req.on("end", () => {
+      try {
+        const { ttlMs } = JSON.parse(body);
+        setTTL(id, ttlMs);
+        res.writeHead(200); res.end(JSON.stringify({ success: true }));
+      } catch {
+        res.writeHead(400); res.end();
+      }
+    });
+    return;
+  }
+
+  if (url.pathname.startsWith("/sessions/") && req.method === "DELETE") {
+    const id = url.pathname.split("/")[2];
+    destroySession(id);
+    res.writeHead(200); res.end(JSON.stringify({ success: true }));
+    return;
+  }
+
+  res.writeHead(404); res.end();
+});
+
+// ---------- WebSocket server (shares HTTP server) ----------
+const wss = new WebSocketServer({ server: httpServer });
+
+httpServer.listen(PORT, () => {
+  console.log(`Terminal server (WS + HTTP) listening on :${PORT}`);
+});
+
+wss.on("connection", (ws: WebSocket, req) => {
+  if (!verifyAuth(req)) {
+    ws.close(4001, "Unauthorized");
+    return;
+  }
+
+  const url = new URL(req.url || "/", `http://localhost:${PORT}`);
+  const shellName = url.searchParams.get("shell") || "powershell";
+  const sessionId = url.searchParams.get("sessionId") || undefined;
+
+  // Reattach or create session
+  let session: Session | undefined = sessionId ? sessions.get(sessionId) : undefined;
+
+  if (session) {
+    console.log(`[${session.id}] Client reattached (${session.clients.size + 1} total)`);
+    cancelTTL(session);
+
+    // Send existing buffered log to this client
+    try {
+      if (existsSync(session.logPath)) {
+        const buffered = readFileSync(session.logPath, "utf-8");
+        if (buffered.length > 0) {
+          ws.send(JSON.stringify({ type: "output", data: buffered }));
+        }
+      }
+    } catch {}
+  } else {
+    session = createSession(shellName, sessionId);
+  }
+
+  session.clients.add(ws);
+
+  // Send session info so client knows the id
+  try {
+    ws.send(JSON.stringify({ type: "session", id: session.id, ttlMs: session.ttlMs }));
+  } catch {}
+
   ws.on("message", (raw) => {
     try {
       const msg = JSON.parse(raw.toString());
+      if (!session) return;
+      updateMeta(session.id, { lastActive: new Date().toISOString() });
       switch (msg.type) {
         case "input":
-          console.log(`INPUT: ${JSON.stringify(msg.data).slice(0, 50)}`);
-          ptyProcess.write(msg.data);
+          session.pty.write(msg.data);
           break;
         case "resize":
-          console.log(`RESIZE: ${msg.cols}x${msg.rows}`);
           if (msg.cols && msg.rows) {
-            ptyProcess.resize(msg.cols, msg.rows);
+            session.pty.resize(msg.cols, msg.rows);
+            session.cols = msg.cols;
+            session.rows = msg.rows;
           }
           break;
+        case "ttl":
+          // { type: "ttl", ttlMs: number | "unlimited" }
+          setTTL(session.id, msg.ttlMs);
+          break;
       }
-    } catch (err) {
-      console.error("Message parse error:", err);
-    }
+    } catch {}
   });
 
-  // Cleanup on WebSocket close
   ws.on("close", () => {
-    console.log(`PTY closed (pid: ${ptyProcess.pid})`);
-    try {
-      ptyProcess.kill();
-    } catch {}
+    if (!session) return;
+    session.clients.delete(ws);
+    console.log(`[${session.id}] Client disconnected (${session.clients.size} remaining)`);
+    if (session.clients.size === 0) {
+      startTTL(session);
+    }
   });
 });

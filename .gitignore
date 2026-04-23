@@ -5,6 +5,7 @@ data/auth.json
 data/port-forwards.json
 data/challenges.json
 data/apps.json
+data/terminal-sessions/
 .webui_secret_key
 guacamole-config/user-mapping.xml
 shared/
