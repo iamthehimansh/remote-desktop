@@ -3,6 +3,7 @@ import { Header } from "@/components/header";
 import { Toaster } from "@/components/ui/toaster";
 import { PersistentSessionsProvider } from "@/contexts/persistent-sessions";
 import { PersistentTerminalHost } from "@/components/persistent-terminal-host";
+import { PersistentRdpHost } from "@/components/persistent-rdp-host";
 
 export default function DashboardLayout({
   children,
@@ -17,8 +18,9 @@ export default function DashboardLayout({
           <Header />
           <main className="flex-1 overflow-auto relative">
             <div className="p-6 h-full">{children}</div>
-            {/* Persistent terminals — always mounted, visibility toggled by route */}
+            {/* Persistent terminals + RDP — always mounted, visibility toggled by route */}
             <PersistentTerminalHost />
+            <PersistentRdpHost />
           </main>
         </div>
         <Toaster />

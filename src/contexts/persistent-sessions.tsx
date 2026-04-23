@@ -13,6 +13,12 @@ interface PersistentSessionsContextValue {
   setTerminalTabs: React.Dispatch<React.SetStateAction<TerminalTab[]>>;
   activeTabId: string;
   setActiveTabId: (id: string) => void;
+
+  // RDP
+  rdpRunning: boolean;
+  setRdpRunning: (running: boolean) => void;
+  rdpFullscreen: boolean;
+  setRdpFullscreen: (fs: boolean) => void;
 }
 
 const PersistentSessionsContext = createContext<PersistentSessionsContextValue | null>(null);
@@ -22,10 +28,15 @@ export function PersistentSessionsProvider({ children }: { children: ReactNode }
     { id: "1", shell: "powershell", title: "PowerShell" },
   ]);
   const [activeTabId, setActiveTabId] = useState("1");
+  const [rdpRunning, setRdpRunning] = useState(false);
+  const [rdpFullscreen, setRdpFullscreen] = useState(false);
 
   return (
     <PersistentSessionsContext.Provider
-      value={{ terminalTabs, setTerminalTabs, activeTabId, setActiveTabId }}
+      value={{
+        terminalTabs, setTerminalTabs, activeTabId, setActiveTabId,
+        rdpRunning, setRdpRunning, rdpFullscreen, setRdpFullscreen,
+      }}
     >
       {children}
     </PersistentSessionsContext.Provider>
