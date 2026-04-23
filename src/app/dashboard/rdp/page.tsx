@@ -163,7 +163,7 @@ export default function RdpPage() {
       <iframe
         src={guacUrl}
         className="flex-1 w-full border-0"
-        allow="clipboard-read; clipboard-write"
+        allow="clipboard-read *; clipboard-write *; microphone *; camera *; fullscreen *; display-capture *"
       />
     </div>
   );
