@@ -28,13 +28,31 @@ export function PersistentRdpHost() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Fetch a Guacamole auth token on the server so the iframe auto-logs in.
+  // Credentials stay on the server; only the short-lived token hits the browser.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const url = window.location.hostname === "localhost"
-      ? "http://localhost:8080/guacamole/#/"
-      : `${window.location.protocol}//${window.location.host}/guacamole/#/`;
-    setGuacUrl(url);
-  }, []);
+    if (!rdpRunning) return;
+
+    const buildUrl = async () => {
+      const base = `${window.location.protocol}//${window.location.host}/guacamole`;
+
+      let tokenParam = "";
+      try {
+        const res = await fetch("/api/rdp/token", { method: "POST" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.token) {
+            tokenParam = `?token=${encodeURIComponent(data.token)}`;
+          }
+        }
+      } catch {}
+
+      setGuacUrl(`${base}/${tokenParam}#/`);
+    };
+
+    buildUrl();
+  }, [rdpRunning]);
 
   useEffect(() => {
     if (screenfull.isEnabled) {
