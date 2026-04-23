@@ -8,12 +8,14 @@ import "@xterm/xterm/css/xterm.css";
 
 interface TerminalViewProps {
   shell: string;
+  tabId?: string;
 }
 
-export default function TerminalView({ shell }: TerminalViewProps) {
+export default function TerminalView({ shell, tabId }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<Terminal | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
   const disposedRef = useRef(false);
 
   useEffect(() => {
@@ -41,19 +43,21 @@ export default function TerminalView({ shell }: TerminalViewProps) {
       lineHeight: 1.2,
       cursorBlink: true,
       cursorStyle: "block",
+      scrollback: 10000,
     });
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.loadAddon(new WebLinksAddon());
     termRef.current = term;
+    fitRef.current = fitAddon;
 
     term.open(container);
     setTimeout(() => {
       if (!disposedRef.current) try { fitAddon.fit(); } catch {}
     }, 100);
 
-    // Terminal input handler (wired before WS connects so it's ready)
+    // Terminal input handler
     term.onData((data) => {
       const socket = wsRef.current;
       if (socket && socket.readyState === WebSocket.OPEN) {
@@ -61,9 +65,11 @@ export default function TerminalView({ shell }: TerminalViewProps) {
       }
     });
 
-    // Resize observer
+    // Resize observer — also refits when container becomes visible again
     const observer = new ResizeObserver(() => {
       if (disposedRef.current) return;
+      // Only fit if container has real dimensions (not hidden)
+      if (container.offsetWidth === 0 || container.offsetHeight === 0) return;
       try {
         fitAddon.fit();
         const socket = wsRef.current;
@@ -74,7 +80,16 @@ export default function TerminalView({ shell }: TerminalViewProps) {
     });
     observer.observe(container);
 
-    // Connect WebSocket (async to fetch token for prod)
+    // Also refit on window focus/visibility changes
+    const handleVisible = () => {
+      if (!disposedRef.current && container.offsetWidth > 0) {
+        try { fitAddon.fit(); } catch {}
+      }
+    };
+    window.addEventListener("focus", handleVisible);
+    document.addEventListener("visibilitychange", handleVisible);
+
+    // Connect WebSocket
     const connect = async () => {
       const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
@@ -131,12 +146,16 @@ export default function TerminalView({ shell }: TerminalViewProps) {
     return () => {
       disposedRef.current = true;
       observer.disconnect();
+      window.removeEventListener("focus", handleVisible);
+      document.removeEventListener("visibilitychange", handleVisible);
       wsRef.current?.close();
       term.dispose();
       wsRef.current = null;
       termRef.current = null;
+      fitRef.current = null;
     };
-  }, [shell]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shell, tabId]);
 
   return <div ref={containerRef} className="h-full w-full" style={{ minHeight: "200px" }} />;
 }

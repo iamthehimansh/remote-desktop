@@ -9,6 +9,7 @@ data/apps.json
 guacamole-config/user-mapping.xml
 shared/
 recordings/
+logs-*.txt
 bun.lockb
 *.tsbuildinfo
 next-env.d.ts
