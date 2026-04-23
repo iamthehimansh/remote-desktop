@@ -1,12 +1,12 @@
 // Inline HTML login page served on the app subdomain.
-// Dark theme matching the dashboard.
+// Three independent auth methods: Password / Passkey / TOTP (tabs).
 
 interface Options {
   appId: string;
-  appTitle: string;         // friendly name ("Jupyter Notebook")
-  dashboardUrl: string;     // e.g. https://pc.himansh.in
-  redirectUri: string;      // callback on this same subdomain
-  returnPath: string;       // where to land after successful auth
+  appTitle: string;
+  dashboardUrl: string;
+  redirectUri: string;
+  returnPath: string;
   totpEnabled: boolean;
   passkeyEnabled: boolean;
 }
@@ -34,23 +34,25 @@ export function renderLoginHtml(opts: Options): string {
   .brand{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px}
   .brand svg{color:#3b82f6;width:20px;height:20px}
   .brand h1{margin:0;font-family:"JetBrains Mono",monospace;font-size:18px;font-weight:600}
-  .sub{text-align:center;color:#a1a1aa;font-size:13px;margin-bottom:20px}
-  .app{text-align:center;margin:14px 0 20px;font-size:14px}
+  .sub{text-align:center;color:#a1a1aa;font-size:13px;margin-bottom:8px}
+  .app{text-align:center;margin:10px 0 20px;font-size:14px}
   .app b{color:#3b82f6}
   .err{color:#ef4444;text-align:center;font-size:13px;min-height:18px;margin-bottom:8px}
   .loading{text-align:center;color:#a1a1aa;font-size:12px;padding:16px}
+  .tabs{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;background:#27272a;border-radius:8px;padding:3px;margin-bottom:14px}
+  .tab{padding:6px 10px;text-align:center;color:#a1a1aa;font-size:12px;cursor:pointer;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:5px;border:none;background:transparent;font-family:inherit}
+  .tab.active{background:#18181b;color:#fafafa}
+  .tab svg{width:12px;height:12px}
   input{width:100%;padding:10px 12px;border-radius:6px;background:#27272a;border:1px solid #3f3f46;
     color:#fafafa;font-size:14px;font-family:inherit;margin-bottom:10px}
   input:focus{outline:none;border-color:#3b82f6}
   input.totp{font-family:"JetBrains Mono",monospace;text-align:center;font-size:20px;letter-spacing:8px}
-  button{width:100%;padding:10px;border-radius:6px;background:#3b82f6;color:#fff;border:none;
+  button.primary{width:100%;padding:10px;border-radius:6px;background:#3b82f6;color:#fff;border:none;
     font-size:14px;font-weight:500;cursor:pointer;font-family:inherit}
-  button:hover{background:#2563eb}
-  button:disabled{opacity:.5;cursor:not-allowed}
-  button.secondary{background:#27272a;margin-top:8px}
-  button.secondary:hover{background:#3f3f46}
-  .row{display:flex;align-items:center;gap:8px;margin:14px 0;color:#52525b;font-size:12px}
-  .row::before,.row::after{content:"";flex:1;height:1px;background:#3f3f46}
+  button.primary:hover{background:#2563eb}
+  button.primary:disabled{opacity:.5;cursor:not-allowed}
+  .pane{display:none}
+  .pane.active{display:block}
   .shake{animation:shake .4s}
   @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
   .hidden{display:none}
@@ -62,21 +64,48 @@ export function renderLoginHtml(opts: Options): string {
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
     <h1>PC Dashboard</h1>
   </div>
-  <div class="sub">Sign in to continue</div>
-  <div class="app">Opening <b>${escape(opts.appTitle)}</b></div>
+  <div class="sub">pc.himansh.in</div>
+  <div class="app">Sign in to open <b>${escape(opts.appTitle)}</b></div>
 
   <div id="sso" class="loading">Checking session…</div>
 
-  <form id="form" class="hidden" autocomplete="off">
+  <div id="form-wrap" class="hidden">
     <div class="err" id="err"></div>
-    <input type="password" id="pass" placeholder="Dashboard password" required autocomplete="current-password">
-    ${opts.totpEnabled ? `<input class="totp" id="totp" placeholder="••••••" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">` : ``}
-    <button type="submit" id="submit">Sign in</button>
+
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-pane="password" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        Password
+      </button>
+      ${opts.passkeyEnabled ? `
+      <button class="tab" data-pane="passkey" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 7V5a5 5 0 00-10 0"/><circle cx="12" cy="14" r="3"/></svg>
+        Passkey
+      </button>` : ``}
+      ${opts.totpEnabled ? `
+      <button class="tab" data-pane="totp" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/></svg>
+        TOTP
+      </button>` : ``}
+    </div>
+
+    <form class="pane active" id="pane-password" data-pane="password" autocomplete="off">
+      <input type="password" id="pass" placeholder="Dashboard password" required autocomplete="current-password">
+      <button type="submit" class="primary" id="submit-pw">Sign in</button>
+    </form>
+
     ${opts.passkeyEnabled ? `
-    <div class="row">or</div>
-    <button type="button" class="secondary" id="pkbtn">Sign in with Passkey</button>
-    ` : ``}
-  </form>
+    <div class="pane" id="pane-passkey" data-pane="passkey">
+      <p style="color:#a1a1aa;font-size:13px;margin:0 0 12px">Use your registered passkey.</p>
+      <button type="button" class="primary" id="pkbtn">Sign in with Passkey</button>
+    </div>` : ``}
+
+    ${opts.totpEnabled ? `
+    <form class="pane" id="pane-totp" data-pane="totp" autocomplete="off">
+      <input type="text" id="totp" class="totp" placeholder="••••••" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">
+      <button type="submit" class="primary" id="submit-totp">Verify</button>
+    </form>` : ``}
+  </div>
 </div>
 <script>
 const APP = ${JSON.stringify({
@@ -90,82 +119,92 @@ const APP = ${JSON.stringify({
   })};
 
 const ssoEl = document.getElementById("sso");
-const formEl = document.getElementById("form");
+const formWrap = document.getElementById("form-wrap");
 const errEl = document.getElementById("err");
 const cardEl = document.getElementById("card");
 
-function showForm() {
-  ssoEl.classList.add("hidden");
-  formEl.classList.remove("hidden");
-}
+function showForm() { ssoEl.classList.add("hidden"); formWrap.classList.remove("hidden"); }
 function showError(msg) {
   errEl.textContent = msg;
-  cardEl.classList.remove("shake");
-  void cardEl.offsetWidth;
-  cardEl.classList.add("shake");
+  cardEl.classList.remove("shake"); void cardEl.offsetWidth; cardEl.classList.add("shake");
 }
 
-// 1) Silent SSO attempt: see if the user is already logged in to the dashboard.
-//    We do this by checking if the dashboard can issue an auth code for us.
+document.querySelectorAll(".tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    const target = tab.getAttribute("data-pane");
+    document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t === tab));
+    document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("active", p.getAttribute("data-pane") === target));
+    errEl.textContent = "";
+  });
+});
+
+async function exchangeCode(code) {
+  const res = await fetch("/__pcdash/callback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code, redirectUri: APP.redirectUri }),
+  });
+  if (!res.ok) throw new Error("Token exchange failed");
+  location.href = APP.returnPath || "/";
+}
+
 async function trySilentSSO() {
-  try {
-    const url = new URL(APP.dashboardUrl + "/api/oauth/authorize");
-    url.searchParams.set("client_id", APP.appId);
-    url.searchParams.set("redirect_uri", APP.redirectUri);
-    url.searchParams.set("state", APP.state);
-    url.searchParams.set("prompt", "silent");
-    // Use a window.location navigation (cookies on pc.himansh.in go with it).
-    // If logged in, server redirects to redirectUri?code=...&state=...
-    // If not, server redirects to redirectUri?error=login_required&state=...
-    window.location.href = url.toString();
-  } catch (e) {
-    showForm();
-  }
+  const url = new URL(APP.dashboardUrl + "/api/oauth/authorize");
+  url.searchParams.set("client_id", APP.appId);
+  url.searchParams.set("redirect_uri", APP.redirectUri);
+  url.searchParams.set("state", APP.state);
+  url.searchParams.set("prompt", "silent");
+  window.location.href = url.toString();
 }
 
-// If we landed back here with ?error=login_required, just show the form
 const params = new URLSearchParams(location.search);
-if (params.get("error") === "login_required") {
+if (params.has("error")) {
   showForm();
+  const e = params.get("error");
+  if (e && e !== "login_required") showError("Sign in issue: " + e);
 } else {
   trySilentSSO();
 }
 
-// Password + TOTP submit
-formEl?.addEventListener("submit", async (e) => {
+// Password
+document.getElementById("pane-password")?.addEventListener("submit", async (e) => {
   e.preventDefault();
   errEl.textContent = "";
-  const submitBtn = document.getElementById("submit");
-  submitBtn.disabled = true;
+  const btn = document.getElementById("submit-pw");
+  btn.disabled = true;
   try {
-    const pass = document.getElementById("pass").value;
-    const totp = APP.totpEnabled ? document.getElementById("totp").value : undefined;
     const res = await fetch(APP.dashboardUrl + "/api/oauth/password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pass, totp, clientId: APP.appId, redirectUri: APP.redirectUri }),
+      body: JSON.stringify({ password: document.getElementById("pass").value, clientId: APP.appId, redirectUri: APP.redirectUri }),
     });
     const data = await res.json();
-    if (!res.ok) {
-      showError(data.error || "Sign in failed");
-      return;
-    }
-    // Exchange code via Worker callback to set the per-app cookie
-    const cbRes = await fetch("/__pcdash/callback", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: data.code, redirectUri: APP.redirectUri }),
-    });
-    if (!cbRes.ok) { showError("Token exchange failed"); return; }
-    location.href = APP.returnPath || "/";
-  } catch (err) {
-    showError("Network error");
-  } finally {
-    submitBtn.disabled = false;
-  }
+    if (!res.ok) { showError(data.error || "Sign in failed"); return; }
+    await exchangeCode(data.code);
+  } catch (err) { showError("Network error"); }
+  finally { btn.disabled = false; }
 });
 
-// Passkey — opens a popup to the dashboard's OAuth authorize endpoint
+// TOTP
+document.getElementById("pane-totp")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  errEl.textContent = "";
+  const btn = document.getElementById("submit-totp");
+  btn.disabled = true;
+  try {
+    const res = await fetch(APP.dashboardUrl + "/api/oauth/totp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ totp: document.getElementById("totp").value, clientId: APP.appId, redirectUri: APP.redirectUri }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showError(data.error || "Invalid code"); return; }
+    await exchangeCode(data.code);
+  } catch (err) { showError("Network error"); }
+  finally { btn.disabled = false; }
+});
+
+// Passkey via popup (WebAuthn must run on pc.himansh.in origin)
 document.getElementById("pkbtn")?.addEventListener("click", () => {
   const url = new URL(APP.dashboardUrl + "/api/oauth/authorize");
   url.searchParams.set("client_id", APP.appId);
@@ -173,24 +212,16 @@ document.getElementById("pkbtn")?.addEventListener("click", () => {
   url.searchParams.set("state", APP.state);
   const popup = window.open(url.toString(), "pcdash_pk", "width=440,height=620,popup=yes");
   if (!popup) { showError("Popup blocked"); return; }
-
-  // The callback URL is on THIS same origin, so postMessage from there works.
   window.addEventListener("message", async (ev) => {
     if (ev.origin !== location.origin) return;
     if (ev.data?.type !== "pcdash_code") return;
     if (ev.data.state !== APP.state) return;
-    const cbRes = await fetch("/__pcdash/callback", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: ev.data.code, redirectUri: APP.redirectUri }),
-    });
-    if (cbRes.ok) location.href = APP.returnPath || "/";
-    else showError("Token exchange failed");
+    if (ev.data.error) { showError("Passkey: " + ev.data.error); return; }
+    try { await exchangeCode(ev.data.code); } catch (e) { showError("Sign in failed"); }
   });
 });
 </script>
-</body>
-</html>`;
+</body></html>`;
 }
 
 function escape(s: string): string {

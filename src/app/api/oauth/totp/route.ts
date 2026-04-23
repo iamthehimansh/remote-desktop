@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { verifyPassword } from "@/lib/auth";
 import { getTOTP, hasTOTP } from "@/lib/auth-store";
 import { authenticator } from "otplib";
 import { issueCode } from "@/lib/oauth-codes";
@@ -7,13 +6,11 @@ import { isValidRedirect, getClient } from "@/lib/oauth-clients";
 
 export const dynamic = "force-dynamic";
 
-// Rate limit: 5 failed attempts / minute / IP
 const attempts = new Map<string, { count: number; resetAt: number }>();
-function rateLimited(ip: string): boolean {
+function rateLimited(ip: string) {
   const now = Date.now();
   const rec = attempts.get(ip);
-  if (rec && now < rec.resetAt && rec.count >= 5) return true;
-  return false;
+  return !!(rec && now < rec.resetAt && rec.count >= 5);
 }
 function registerFail(ip: string) {
   const now = Date.now();
@@ -26,17 +23,14 @@ function allowedOrigin(origin: string | null): string | null {
   if (!origin) return null;
   try {
     const u = new URL(origin);
-    if (u.hostname === "pc.himansh.in" || u.hostname.endsWith(".himansh.in")) {
-      return origin;
-    }
+    if (u.hostname === "pc.himansh.in" || u.hostname.endsWith(".himansh.in")) return origin;
   } catch {}
   return null;
 }
 
 function corsHeaders(origin: string | null): Record<string, string> {
-  const ok = allowedOrigin(origin) || "null";
   return {
-    "Access-Control-Allow-Origin": ok,
+    "Access-Control-Allow-Origin": allowedOrigin(origin) || "null",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
@@ -58,26 +52,27 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const { password, totp, clientId, redirectUri } = body;
+  const { totp, clientId, redirectUri } = body;
 
-  if (!password || !clientId || !redirectUri) {
+  if (!totp || !clientId || !redirectUri) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400, headers });
   }
-
   if (!getClient(clientId)) {
     return NextResponse.json({ error: "Unknown client" }, { status: 400, headers });
   }
   if (!isValidRedirect(clientId, redirectUri)) {
     return NextResponse.json({ error: "Invalid redirect_uri" }, { status: 400, headers });
   }
-
-  const passOk = await verifyPassword(password);
-  if (!passOk) {
-    registerFail(ip);
-    return NextResponse.json({ error: "Invalid credentials" }, { status: 401, headers });
+  if (!hasTOTP()) {
+    return NextResponse.json({ error: "TOTP not enabled" }, { status: 400, headers });
   }
 
-  // Password alone is sufficient; TOTP is a separate path (POST /api/oauth/totp)
+  const t = getTOTP();
+  if (!t || !authenticator.verify({ token: String(totp), secret: t.secret })) {
+    registerFail(ip);
+    return NextResponse.json({ error: "Invalid TOTP code" }, { status: 401, headers });
+  }
+
   const code = issueCode(clientId, redirectUri);
   return NextResponse.json({ code }, { headers });
 }

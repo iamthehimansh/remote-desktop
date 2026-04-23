@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
   "/api/auth/totp/login",
   "/api/auth/methods",
   "/api/oauth/password",   // CORS endpoint used by Worker login UI
+  "/api/oauth/totp",       // CORS endpoint used by Worker login UI
   "/api/oauth/authorize",  // handles its own auth via dashboard cookie
   "/api/oauth/token",      // server-to-server, verifies client secret itself
   "/api/oauth/userinfo",   // verifies Bearer token itself

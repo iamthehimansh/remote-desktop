@@ -128,7 +128,20 @@ async function main() {
 
   console.log("Setting secrets…");
   await setSecret("JWT_SECRET", JWT_SECRET!);
-  await setSecret("OAUTH_CLIENT_SECRETS", "{}"); // empty until apps are toggled on
+
+  // Preserve existing client secrets: read data/oauth-clients.json if present
+  let clientSecrets = "{}";
+  try {
+    const raw = readFileSync(resolve(PROJECT_ROOT, "data/oauth-clients.json"), "utf-8");
+    const clients = JSON.parse(raw) as Record<string, { clientSecret: string }>;
+    const map: Record<string, string> = {};
+    for (const [id, c] of Object.entries(clients)) map[id] = c.clientSecret;
+    clientSecrets = JSON.stringify(map);
+    console.log(`Synced ${Object.keys(map).length} client secret(s)`);
+  } catch {
+    console.log("No oauth-clients.json yet; setting empty secrets");
+  }
+  await setSecret("OAUTH_CLIENT_SECRETS", clientSecrets);
 
   console.log("\nDone. Worker is deployed. Enable auth on an app to add a route.");
 }

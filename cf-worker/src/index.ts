@@ -168,17 +168,64 @@ function handlePopupCallback(url: URL): Response {
   const code = url.searchParams.get("code") || "";
   const state = url.searchParams.get("state") || "";
   const error = url.searchParams.get("error") || "";
-  const html = `<!doctype html><html><body><script>
-    (function(){
+  const redirectUri = `${url.protocol}//${url.host}/__pcdash/callback`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Signing in…</title>
+<style>body{margin:0;background:#09090b;color:#fafafa;font-family:system-ui,-apple-system,sans-serif;display:grid;place-items:center;height:100vh;font-size:14px}</style>
+</head><body>
+<p id="msg">Signing in…</p>
+<script>
+(async function(){
+  var code = ${JSON.stringify(code)};
+  var state = ${JSON.stringify(state)};
+  var error = ${JSON.stringify(error)};
+  var redirectUri = ${JSON.stringify(redirectUri)};
+
+  // Only treat as popup if window was opened with our known name OR opener is
+  // same-origin (the login UI served by this Worker). When opener is cross-origin
+  // (e.g. dashboard's Open button), this is a main-tab navigation, not a popup.
+  var isPopup = false;
+  if (window.opener && window.opener !== window) {
+    if (window.name === "pcdash_pk") {
+      isPopup = true;
+    } else {
       try {
-        if (window.opener) {
-          window.opener.postMessage({ type: "pcdash_code", code: ${JSON.stringify(code)}, state: ${JSON.stringify(state)}, error: ${JSON.stringify(error)} }, "*");
-        }
-      } catch(e) {}
-      window.close();
-    })();
-  </script>You can close this window.</body></html>`;
-  return new Response(html, { status: 200, headers: { "Content-Type": "text/html" } });
+        if (window.opener.location.origin === window.location.origin) isPopup = true;
+      } catch(_) {}
+    }
+  }
+  if (isPopup) {
+    try {
+      window.opener.postMessage({ type: "pcdash_code", code: code, state: state, error: error }, "*");
+    } catch(e) {}
+    setTimeout(function(){ window.close(); }, 50);
+    return;
+  }
+
+  // Regular navigation (silent SSO landed here). No opener — exchange ourselves.
+  if (error || !code) {
+    // Silent check returned login_required — show login UI on root.
+    location.replace("/?error=login_required");
+    return;
+  }
+  try {
+    var res = await fetch("/__pcdash/callback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: code, redirectUri: redirectUri })
+    });
+    if (res.ok) {
+      location.replace("/");
+    } else {
+      document.getElementById("msg").textContent = "Sign in failed";
+      setTimeout(function(){ location.replace("/?error=exchange_failed"); }, 1200);
+    }
+  } catch(e) {
+    document.getElementById("msg").textContent = "Network error: " + e.message;
+  }
+})();
+</script>
+</body></html>`;
+  return new Response(html, { status: 200, headers: { "Content-Type": "text/html", "Cache-Control": "no-store" } });
 }
 
 function handleLogout(appId: string, env: Env): Response {
