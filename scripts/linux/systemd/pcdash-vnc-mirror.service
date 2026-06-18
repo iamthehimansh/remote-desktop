@@ -1,0 +1,15 @@
+[Unit]
+Description=PC Dashboard x11vnc mirror of the physical screen (:0 -> 5900)
+# Mirrors the desktop you are physically logged into. Requires an Xorg session
+# (log in via "Ubuntu on Xorg" at the GDM gear menu) — does NOT work on Wayland.
+# Not enabled by default; enable with: systemctl --user enable --now pcdash-vnc-mirror pcdash-novnc-mirror
+
+[Service]
+Type=simple
+Environment=DISPLAY=:0
+ExecStart=/usr/bin/x11vnc -display :0 -auth guess -localhost -rfbport 5900 -forever -shared -noxdamage -rfbauth __HOME__/.vnc/passwd
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

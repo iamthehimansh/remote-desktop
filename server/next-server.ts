@@ -10,20 +10,25 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import httpProxy from "http-proxy";
 
-// Load .env.local manually
-try {
-  const envPath = resolve(process.cwd(), ".env.local");
-  const envContent = readFileSync(envPath, "utf-8");
-  for (const line of envContent.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eqIdx = trimmed.indexOf("=");
-    if (eqIdx === -1) continue;
-    const key = trimmed.slice(0, eqIdx).trim();
-    const val = trimmed.slice(eqIdx + 1).trim().replace(/\\(.)/g, "$1");
-    if (!process.env[key]) process.env[key] = val;
-  }
-} catch {}
+// Load env files manually. On Linux, `.env.linux` is loaded FIRST so its
+// values win (first-set wins) over the Windows paths in `.env.local`.
+// These run before Next.js prepares, and Next won't override already-set vars.
+function loadEnvFile(path: string) {
+  try {
+    const envContent = readFileSync(path, "utf-8");
+    for (const line of envContent.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx === -1) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      const val = trimmed.slice(eqIdx + 1).trim().replace(/\\(.)/g, "$1");
+      if (!process.env[key]) process.env[key] = val;
+    }
+  } catch {}
+}
+if (process.platform === "linux") loadEnvFile(resolve(process.cwd(), ".env.linux"));
+loadEnvFile(resolve(process.cwd(), ".env.local"));
 
 // Default to production mode for `bun run start`. `bun run dev` sets NODE_ENV=development.
 if (!process.env.NODE_ENV) process.env.NODE_ENV = "production";

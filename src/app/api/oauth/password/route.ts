@@ -7,6 +7,8 @@ import { isValidRedirect, getClient } from "@/lib/oauth-clients";
 
 export const dynamic = "force-dynamic";
 
+const PASSWORD_LOGIN_DISABLED = true;
+
 // Rate limit: 5 failed attempts / minute / IP
 const attempts = new Map<string, { count: number; resetAt: number }>();
 function rateLimited(ip: string): boolean {
@@ -52,6 +54,10 @@ export async function POST(request: Request) {
   const origin = request.headers.get("origin");
   const ip = request.headers.get("x-forwarded-for") || "unknown";
   const headers = corsHeaders(origin);
+
+  if (PASSWORD_LOGIN_DISABLED) {
+    return NextResponse.json({ error: "Password login is disabled" }, { status: 403, headers });
+  }
 
   if (rateLimited(ip)) {
     return NextResponse.json({ error: "Too many attempts" }, { status: 429, headers });

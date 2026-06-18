@@ -2,7 +2,11 @@ import { resolve, normalize } from "path";
 
 export function getFileManagerRoot(): string {
   // Default starting directory — but we allow navigating anywhere
-  return normalize(process.env.FILE_MANAGER_ROOT || "C:\\Users\\pc");
+  const fallback =
+    process.platform === "win32"
+      ? "C:\\Users\\pc"
+      : process.env.HOME || "/home";
+  return normalize(process.env.FILE_MANAGER_ROOT || fallback);
 }
 
 export function safePath(requestedPath: string): string {

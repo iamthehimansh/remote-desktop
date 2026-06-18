@@ -5,15 +5,28 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/htmx.org@2.0.3"></script>
-<style>body{background:#09090b}.mono{font-family:'JetBrains Mono',monospace}</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/lib/addon-web-links.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@simplewebauthn/browser@11/dist/bundle/index.umd.min.js"></script>
+<style>
+body{background:#09090b}
+.mono{font-family:'JetBrains Mono',monospace}
+.modal-backdrop{background:rgba(0,0,0,.55);backdrop-filter:blur(4px)}
+.term-tab{display:flex;align-items:center;gap:6px;padding:0 12px;height:100%;font-size:12px;border-right:1px solid #27272a;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.term-tab.active{background:#000;color:#fafafa}
+.term-tab:not(.active){color:#a1a1aa}
+.term-tab:not(.active):hover{background:#1f1f22}
+</style>
 </head>
 <body class="min-h-screen bg-zinc-950 text-zinc-100">
-<header class="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur px-6 h-14 flex items-center justify-between sticky top-0 z-10">
+
+<header class="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur px-6 h-14 flex items-center justify-between sticky top-0 z-20">
   <div class="flex items-center gap-3">
     <svg class="w-5 h-5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>
     <span class="font-mono text-sm">pi.himansh.in</span>
-    <span id="pi-status" class="text-xs text-emerald-500 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Live</span>
+    <span class="text-xs text-emerald-500 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Live</span>
   </div>
   <nav class="flex items-center gap-1 text-sm">
     <button class="tab-btn px-3 py-1.5 rounded hover:bg-zinc-800" data-tab="overview">Overview</button>
@@ -21,40 +34,23 @@
     <button class="tab-btn px-3 py-1.5 rounded hover:bg-zinc-800" data-tab="ports">Ports</button>
     <button class="tab-btn px-3 py-1.5 rounded hover:bg-zinc-800" data-tab="terminal">Terminal</button>
     <button class="tab-btn px-3 py-1.5 rounded hover:bg-zinc-800" data-tab="files">Files</button>
+    <button class="tab-btn px-3 py-1.5 rounded hover:bg-zinc-800" data-tab="settings">Settings</button>
     <button id="logout" class="ml-2 px-3 py-1.5 rounded text-red-400 hover:bg-red-500/10">Logout</button>
   </nav>
 </header>
 
 <main class="p-6 max-w-7xl mx-auto">
 
-<!-- Overview -->
 <section class="tab-pane" data-tab="overview">
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-    <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
-      <p class="text-xs uppercase tracking-wider text-zinc-500">CPU Load</p>
-      <p class="text-2xl mono font-semibold mt-1 text-blue-400" id="cpu">—</p>
-      <p class="text-xs text-zinc-400 mt-1">1m / 5m / 15m</p>
-    </div>
-    <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
-      <p class="text-xs uppercase tracking-wider text-zinc-500">Memory</p>
-      <p class="text-2xl mono font-semibold mt-1 text-emerald-400" id="mem">—</p>
-      <p class="text-xs text-zinc-400 mt-1" id="mem-sub">—</p>
-    </div>
-    <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
-      <p class="text-xs uppercase tracking-wider text-zinc-500">Temperature</p>
-      <p class="text-2xl mono font-semibold mt-1 text-amber-400" id="temp">—</p>
-      <p class="text-xs text-zinc-400 mt-1" id="uptime">—</p>
-    </div>
-    <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800 flex flex-col">
-      <p class="text-xs uppercase tracking-wider text-zinc-500">PC</p>
-      <p class="text-2xl mono font-semibold mt-1"><span id="pc-badge" class="text-zinc-500">—</span></p>
-      <button id="wake" class="mt-2 px-3 py-1.5 text-sm rounded bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed">Wake PC</button>
-    </div>
+    <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800"><p class="text-xs uppercase tracking-wider text-zinc-500">CPU Load</p><p class="text-2xl mono font-semibold mt-1 text-blue-400" id="cpu">—</p><p class="text-xs text-zinc-400 mt-1">1m / 5m / 15m</p></div>
+    <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800"><p class="text-xs uppercase tracking-wider text-zinc-500">Memory</p><p class="text-2xl mono font-semibold mt-1 text-emerald-400" id="mem">—</p><p class="text-xs text-zinc-400 mt-1" id="mem-sub">—</p></div>
+    <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800"><p class="text-xs uppercase tracking-wider text-zinc-500">Temperature</p><p class="text-2xl mono font-semibold mt-1 text-amber-400" id="temp">—</p><p class="text-xs text-zinc-400 mt-1" id="uptime">—</p></div>
+    <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800 flex flex-col"><p class="text-xs uppercase tracking-wider text-zinc-500">PC</p><p class="text-2xl mono font-semibold mt-1"><span id="pc-badge" class="text-zinc-500">—</span></p><button id="wake" class="mt-2 px-3 py-1.5 text-sm rounded bg-blue-500 hover:bg-blue-600 text-white">Wake PC</button></div>
   </div>
-
   <div class="mt-4 p-4 rounded-lg bg-zinc-900 border border-zinc-800">
     <h2 class="font-semibold mb-3">Pi-hole</h2>
-    <div id="pihole" class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
       <div><p class="text-zinc-500 text-xs">Queries today</p><p class="mono text-xl" id="ph-q">—</p></div>
       <div><p class="text-zinc-500 text-xs">Blocked</p><p class="mono text-xl text-red-400" id="ph-b">—</p></div>
       <div><p class="text-zinc-500 text-xs">% Blocked</p><p class="mono text-xl" id="ph-p">—</p></div>
@@ -63,7 +59,6 @@
   </div>
 </section>
 
-<!-- Apps -->
 <section class="tab-pane hidden" data-tab="apps">
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-xl font-semibold">Apps</h2>
@@ -72,26 +67,23 @@
   <div id="apps-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
 </section>
 
-<!-- Ports -->
 <section class="tab-pane hidden" data-tab="ports">
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-xl font-semibold">Port Forwards</h2>
     <button id="new-port" class="px-3 py-1.5 text-sm rounded bg-blue-500 hover:bg-blue-600 text-white">+ Forward port</button>
   </div>
-  <div id="ports-table" class="rounded-lg bg-zinc-900 border border-zinc-800 overflow-hidden">
-    <table class="w-full text-sm"><thead class="text-zinc-500 text-xs"><tr><th class="text-left p-3">Subdomain</th><th class="text-left p-3">Port</th><th class="text-left p-3">Created</th><th class="text-right p-3">Actions</th></tr></thead><tbody id="ports-tbody"></tbody></table>
+  <div class="rounded-lg bg-zinc-900 border border-zinc-800 overflow-hidden">
+    <table class="w-full text-sm"><thead class="text-zinc-500 text-xs"><tr><th class="text-left p-3">Subdomain</th><th class="text-left p-3">Port</th><th class="text-left p-3">Proto</th><th class="text-left p-3">Status</th><th class="text-left p-3">Created</th><th class="text-right p-3">Actions</th></tr></thead><tbody id="ports-tbody"></tbody></table>
   </div>
 </section>
 
-<!-- Terminal -->
 <section class="tab-pane hidden" data-tab="terminal">
-  <div class="rounded-lg bg-black border border-zinc-800 overflow-hidden" style="height:calc(100vh - 180px)">
-    <iframe src="/terminal/" class="w-full h-full border-0"></iframe>
+  <div class="rounded-lg bg-zinc-950 border border-zinc-800 overflow-hidden" style="height:calc(100vh - 130px)">
+    <div id="term-tabs" class="flex items-stretch h-9 bg-zinc-900 border-b border-zinc-800 overflow-x-auto"></div>
+    <div id="term-views" class="relative bg-black" style="height:calc(100% - 2.25rem)"></div>
   </div>
-  <p class="text-xs text-zinc-500 mt-2">Terminal is proxied from ttyd (localhost:{{ ttyd_port }}). Secure login prompt will appear on first use.</p>
 </section>
 
-<!-- Files -->
 <section class="tab-pane hidden" data-tab="files">
   <div class="rounded-lg bg-zinc-900 border border-zinc-800 p-4">
     <div class="flex items-center gap-2 mb-3 text-sm">
@@ -99,19 +91,86 @@
       <span id="files-path" class="mono text-zinc-400">/</span>
       <div class="ml-auto flex gap-2">
         <button id="files-mkdir" class="px-2 py-1 rounded hover:bg-zinc-800 text-zinc-400">+ Folder</button>
-        <label class="px-2 py-1 rounded hover:bg-zinc-800 text-zinc-400 cursor-pointer">
-          Upload<input id="files-upload" type="file" multiple class="hidden">
-        </label>
+        <label class="px-2 py-1 rounded hover:bg-zinc-800 text-zinc-400 cursor-pointer">Upload<input id="files-upload" type="file" multiple class="hidden"></label>
       </div>
     </div>
     <table class="w-full text-sm"><tbody id="files-tbody"></tbody></table>
   </div>
 </section>
 
+<section class="tab-pane hidden" data-tab="settings">
+  <div class="max-w-2xl space-y-4">
+    <h2 class="text-xl font-semibold">Settings</h2>
+    <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold flex items-center gap-2">🔑 Passkeys <span id="pk-count" class="text-xs bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded"></span></h3>
+      </div>
+      <div id="pk-list" class="space-y-2 mb-3"></div>
+      <div class="flex gap-2">
+        <input id="pk-name" placeholder="Device name (e.g. MacBook)" class="flex-1 px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-sm">
+        <button id="pk-add" class="px-3 py-2 rounded bg-blue-500 hover:bg-blue-600 text-white text-sm">+ Register</button>
+      </div>
+    </div>
+    <div class="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold flex items-center gap-2">📱 TOTP <span id="totp-badge" class="text-xs px-2 py-0.5 rounded hidden"></span></h3>
+      </div>
+      <div id="totp-off"><p class="text-sm text-zinc-400 mb-3">Add a time-based one-time password as an additional sign-in method.</p><button id="totp-start" class="px-3 py-2 rounded bg-blue-500 hover:bg-blue-600 text-white text-sm">Set up TOTP</button></div>
+      <div id="totp-setup" class="hidden space-y-3">
+        <p class="text-sm text-zinc-400">Scan with Google Authenticator, then verify:</p>
+        <img id="totp-qr" class="w-48 h-48 mx-auto rounded" />
+        <p class="text-xs text-zinc-500 text-center font-mono break-all">Manual key: <span id="totp-secret"></span></p>
+        <div class="flex gap-2">
+          <input id="totp-code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••••" class="flex-1 px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-center font-mono text-xl tracking-[0.5em]">
+          <button id="totp-verify" class="px-3 py-2 rounded bg-emerald-500 hover:bg-emerald-600 text-white text-sm">Verify</button>
+        </div>
+      </div>
+      <div id="totp-on" class="hidden"><button id="totp-disable" class="px-3 py-2 rounded text-red-400 hover:bg-red-500/10 text-sm">Disable TOTP</button></div>
+    </div>
+  </div>
+</section>
+
 </main>
 
+<div id="modal" class="fixed inset-0 modal-backdrop z-50 hidden grid place-items-center p-4">
+  <div class="w-[420px] max-w-full rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden">
+    <div class="px-5 py-3 border-b border-zinc-800 flex items-center justify-between">
+      <h3 id="modal-title" class="font-semibold"></h3>
+      <button onclick="closeModal()" class="text-zinc-500 hover:text-zinc-200">✕</button>
+    </div>
+    <div id="modal-body" class="p-5"></div>
+    <div class="px-5 py-3 border-t border-zinc-800 flex justify-end gap-2">
+      <button onclick="closeModal()" class="px-3 py-1.5 text-sm rounded hover:bg-zinc-800">Cancel</button>
+      <button id="modal-ok" class="px-3 py-1.5 text-sm rounded bg-blue-500 hover:bg-blue-600 text-white">OK</button>
+    </div>
+  </div>
+</div>
+
 <script>
-// Tabs
+function openModal(title, bodyHTML, onOK) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = bodyHTML;
+  const modal = document.getElementById('modal');
+  modal.classList.remove('hidden');
+  const okBtn = document.getElementById('modal-ok');
+  okBtn.textContent = 'OK';
+  const newOk = okBtn.cloneNode(true);
+  okBtn.parentNode.replaceChild(newOk, okBtn);
+  newOk.addEventListener('click', () => onOK(modal));
+  setTimeout(() => { const f = modal.querySelector('input,textarea'); if (f) f.focus(); }, 50);
+}
+function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+document.getElementById('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+function toast(msg, type='ok') {
+  const t = document.createElement('div');
+  t.className = `fixed bottom-6 right-6 px-4 py-2 rounded shadow-lg text-sm z-[100] ${type==='err'?'bg-red-500':'bg-emerald-600'} text-white`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
 document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
   const t = btn.dataset.tab;
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('hidden', p.dataset.tab !== t));
@@ -120,27 +179,25 @@ document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click
 }));
 document.querySelector('.tab-btn[data-tab=overview]').click();
 
-// Logout
 document.getElementById('logout').addEventListener('click', async () => {
   await fetch('/api/logout', { method: 'POST' });
   location.href = '/login';
 });
 
-// Wake PC
 document.getElementById('wake').addEventListener('click', async () => {
-  const btn = document.getElementById('wake');
-  btn.disabled = true; btn.textContent = 'Sending…';
+  const btn = document.getElementById('wake'); btn.disabled = true; btn.textContent = 'Sending…';
   const r = await fetch('/api/wake-pc', { method: 'POST' });
-  btn.textContent = r.ok ? 'Magic packet sent ✓' : 'Failed';
-  setTimeout(() => { btn.disabled = false; btn.textContent = 'Wake PC'; }, 3000);
+  if (r.ok) toast('Magic packet sent'); else toast('Failed','err');
+  setTimeout(() => { btn.disabled = false; btn.textContent = 'Wake PC'; }, 2000);
 });
 
 function fmtBytes(b){if(!b)return'0';const u=['B','KB','MB','GB','TB'];let i=0;while(b>=1024&&i<u.length-1){b/=1024;i++}return b.toFixed(1)+' '+u[i]}
 function fmtUptime(s){const d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);return d?`${d}d ${h}h ${m}m`:`${h}h ${m}m`}
+function fmtTTL(ttl){if(ttl==='unlimited')return'∞';if(!ttl)return'—';const m=Math.round(ttl/60000);if(m<60)return m+'m';if(m<1440)return Math.round(m/60)+'h';return Math.round(m/1440)+'d';}
 
 async function refreshOverview() {
   try {
-    const r = await fetch('/api/stats'); const d = await r.json();
+    const d = await (await fetch('/api/stats')).json();
     document.getElementById('cpu').textContent = d.cpu_load.map(x=>x.toFixed(2)).join(' / ');
     document.getElementById('mem').textContent = `${fmtBytes(d.memory.used)} / ${fmtBytes(d.memory.total)}`;
     document.getElementById('mem-sub').textContent = d.memory.usage.toFixed(1)+'%';
@@ -149,97 +206,194 @@ async function refreshOverview() {
     const b = document.getElementById('pc-badge');
     if (d.pc_online === true) { b.textContent='Online'; b.className='text-emerald-400'; }
     else if (d.pc_online === false) { b.textContent='Offline'; b.className='text-zinc-500'; }
-    else b.textContent='—';
   } catch(e){}
   try {
-    const r = await fetch('/api/pihole'); const d = await r.json();
-    // v6 and v5 shape differs; try both
-    const q = d?.queries?.total ?? d?.dns_queries_today ?? '—';
-    const bl = d?.queries?.blocked ?? d?.ads_blocked_today ?? '—';
-    const p = d?.queries?.percent_blocked ?? d?.ads_percentage_today ?? '—';
-    const dom = d?.gravity?.domains_being_blocked ?? d?.domains_being_blocked ?? '—';
-    document.getElementById('ph-q').textContent = q;
-    document.getElementById('ph-b').textContent = bl;
-    document.getElementById('ph-p').textContent = (p==='—'?p:(+p).toFixed(1)+'%');
-    document.getElementById('ph-d').textContent = dom;
+    const d = await (await fetch('/api/pihole')).json();
+    const q=d?.queries?.total??d?.dns_queries_today??'—';
+    const bl=d?.queries?.blocked??d?.ads_blocked_today??'—';
+    const p=d?.queries?.percent_blocked??d?.ads_percentage_today??'—';
+    const dom=d?.gravity?.domains_being_blocked??d?.domains_being_blocked??'—';
+    document.getElementById('ph-q').textContent=q;
+    document.getElementById('ph-b').textContent=bl;
+    document.getElementById('ph-p').textContent=(p==='—'?p:(+p).toFixed(1)+'%');
+    document.getElementById('ph-d').textContent=dom;
   } catch(e){}
 }
 
+let appsAutoTimer = null;
 async function refreshApps() {
-  const r = await fetch('/api/apps'); const apps = await r.json();
-  const g = document.getElementById('apps-grid'); g.innerHTML='';
+  const apps = await (await fetch('/api/apps')).json();
+  const g = document.getElementById('apps-grid'); g.innerHTML = '';
   for (const a of apps) {
+    const running = a.status === 'running';
+    const starting = a.status === 'starting';
+    const statusColor = running ? 'text-emerald-400' : starting ? 'text-amber-400' : 'text-zinc-500';
+    const statusDot = running ? 'bg-emerald-400' : starting ? 'bg-amber-400' : 'bg-zinc-600';
+    const canStartStop = !!(a.service || a.command);
+    const openUrl = `https://${a.subdomain}.himansh.in${a.path || '/'}`;
     const card = document.createElement('div');
-    card.className = 'p-4 rounded-lg bg-zinc-900 border border-zinc-800';
+    card.className = 'p-4 rounded-lg bg-zinc-900 border border-zinc-800 flex flex-col gap-2';
     card.innerHTML = `
-      <div class="flex items-start justify-between mb-2">
-        <h3 class="font-semibold">${a.name}</h3>
-        <span class="text-xs ${a.status==='running'?'text-emerald-400':'text-zinc-500'}">${a.status}</span>
+      <div class="flex items-start justify-between">
+        <div class="flex items-center gap-2">
+          <h3 class="font-semibold">${a.name}</h3>
+          ${a.authEnabled ? `<span title="Protected by Cloudflare Worker auth" class="text-blue-400 text-xs">🔒</span>` : ''}
+        </div>
+        <span class="flex items-center gap-1.5 text-xs ${statusColor}"><span class="w-1.5 h-1.5 rounded-full ${statusDot}"></span>${a.status}</span>
       </div>
-      <p class="text-xs text-zinc-500 mb-2">${a.subdomain}.himansh.in</p>
-      <p class="text-xs text-zinc-400 mb-3">${a.description||''}</p>
-      <div class="flex gap-2">
-        <a href="https://${a.subdomain}.himansh.in${a.path||'/'}" target="_blank" class="text-sm px-3 py-1.5 rounded bg-blue-500 hover:bg-blue-600 text-white flex-1 text-center">Open</a>
-        ${a.managed ? `<button data-del="${a.id}" class="text-sm px-3 py-1.5 rounded text-red-400 hover:bg-red-500/10">Delete</button>`:''}
+      <p class="text-xs text-zinc-500 mono">${a.subdomain}.himansh.in</p>
+      <p class="text-xs text-zinc-400 line-clamp-2 min-h-[32px]">${a.description || ''}</p>
+      <div class="flex gap-1.5 flex-wrap">
+        ${running ? `<a href="${openUrl}" target="_blank" class="text-xs px-2.5 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white">Open</a>` : ''}
+        ${canStartStop && !running ? `<button data-start="${a.id}" class="text-xs px-2.5 py-1 rounded bg-emerald-500 hover:bg-emerald-600 text-white">Start</button>` : ''}
+        ${canStartStop && running ? `<button data-stop="${a.id}" class="text-xs px-2.5 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-200">Stop</button>` : ''}
+        <button data-auth="${a.id}" data-enabled="${!!a.authEnabled}" title="Toggle Cloudflare Worker auth" class="text-xs px-2.5 py-1 rounded ${a.authEnabled ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'}">${a.authEnabled ? '🔒 Auth on' : '🔓 Auth off'}</button>
+        <button data-creds="${a.id}" title="Edit credentials" class="text-xs px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300">Creds</button>
+        ${a.custom ? `<button data-del="${a.id}" class="text-xs px-2.5 py-1 rounded text-red-400 hover:bg-red-500/10 ml-auto">Delete</button>` : ''}
       </div>`;
     g.appendChild(card);
   }
-  g.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', async()=>{
-    if(!confirm('Delete this app?'))return;
-    await fetch('/api/apps/'+b.dataset.del,{method:'DELETE'});refreshApps();
+  g.querySelectorAll('[data-start]').forEach(b => b.addEventListener('click', async () => {
+    b.disabled = true; b.textContent = '...';
+    const r = await fetch('/api/apps/'+b.dataset.start+'/start', { method: 'POST' });
+    const d = await r.json(); toast(r.ok ? (d.status==='starting' ? 'Starting…' : 'Started') : (d.error || 'Failed'), r.ok ? 'ok' : 'err');
+    refreshApps();
+  }));
+  g.querySelectorAll('[data-stop]').forEach(b => b.addEventListener('click', async () => {
+    b.disabled = true; b.textContent = '...';
+    await fetch('/api/apps/'+b.dataset.stop+'/stop', { method: 'POST' });
+    toast('Stopped'); refreshApps();
+  }));
+  g.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
+    openModal('Delete App', `<p class="text-sm text-zinc-400">This will remove the app, its DNS record, tunnel ingress, and worker auth (if enabled).</p>`, async () => {
+      await fetch('/api/apps/'+b.dataset.del, { method: 'DELETE' });
+      closeModal(); toast('Deleted'); refreshApps();
+    });
+  }));
+  g.querySelectorAll('[data-auth]').forEach(b => b.addEventListener('click', async () => {
+    const enabled = b.dataset.enabled === 'true';
+    const next = !enabled;
+    b.disabled = true;
+    const r = await fetch('/api/apps/'+b.dataset.auth+'/auth', {
+      method: 'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ enabled: next })
+    });
+    const d = await r.json();
+    toast(r.ok ? (next ? 'Auth enabled' : 'Auth disabled') : (d.error || 'Failed'), r.ok ? 'ok' : 'err');
+    refreshApps();
+  }));
+  g.querySelectorAll('[data-creds]').forEach(b => b.addEventListener('click', async () => {
+    const appId = b.dataset.creds;
+    const all = await (await fetch('/api/apps')).json();
+    const a = all.find(x => x.id === appId);
+    openModal('Credentials — ' + a.name, `
+      <div class="space-y-3">
+        <div><label class="text-xs text-zinc-500 mb-1 block">Username (optional)</label><input id="f-user" class="w-full px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-sm" value="${a.username || ''}"></div>
+        <div><label class="text-xs text-zinc-500 mb-1 block">Password / token</label><input id="f-pass" class="w-full px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-sm mono" value="${a.password || ''}"></div>
+        <p class="text-xs text-zinc-500">Used for <span class="mono">{username}</span> and <span class="mono">{token}</span>/<span class="mono">{password}</span> substitutions in the start command. Leave token blank to auto-generate on start.</p>
+      </div>`, async (m) => {
+      const body = { username: m.querySelector('#f-user').value, password: m.querySelector('#f-pass').value };
+      await fetch('/api/apps/'+appId, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      closeModal(); toast('Saved'); refreshApps();
+    });
   }));
 }
 
-document.getElementById('new-app').addEventListener('click', async () => {
-  const name = prompt('App name?'); if (!name) return;
-  const subdomain = prompt('Subdomain (e.g. "nextcloud" for nextcloud.himansh.in)?');
-  if (!subdomain) return;
-  const port = prompt('Local port?'); if (!port) return;
-  const command = prompt('Start command (optional)') || '';
-  const r = await fetch('/api/apps',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,subdomain,port,command})});
-  if(!r.ok){alert((await r.json()).error||'Failed');return;}
-  refreshApps();
+document.getElementById('new-app').addEventListener('click', () => {
+  openModal('Add App', `
+    <div class="space-y-3">
+      <div><label class="text-xs text-zinc-500 mb-1 block">Name</label><input id="f-name" class="w-full px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-sm" placeholder="e.g. Nextcloud"></div>
+      <div><label class="text-xs text-zinc-500 mb-1 block">Subdomain</label><div class="flex items-center"><input id="f-sub" class="flex-1 px-3 py-2 rounded-l bg-zinc-800 border border-zinc-700 text-sm" placeholder="nextcloud"><span class="px-3 py-2 bg-zinc-800 border border-l-0 border-zinc-700 rounded-r text-xs text-zinc-400">.himansh.in</span></div></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-xs text-zinc-500 mb-1 block">Local port</label><input id="f-port" type="number" class="w-full px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-sm mono" placeholder="8080"></div>
+        <div><label class="text-xs text-zinc-500 mb-1 block">Path (optional)</label><input id="f-path" class="w-full px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-sm mono" placeholder="/"></div>
+      </div>
+      <div><label class="text-xs text-zinc-500 mb-1 block">Description (optional)</label><input id="f-desc" class="w-full px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-sm"></div>
+      <div><label class="text-xs text-zinc-500 mb-1 block">Start command (optional)</label><input id="f-cmd" class="w-full px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-sm mono" placeholder="e.g. docker run -p {port}:8080 myimg"></div>
+      <p class="text-xs text-zinc-500">Placeholders: <span class="mono">{port}</span> <span class="mono">{token}</span> <span class="mono">{password}</span> <span class="mono">{username}</span></p>
+    </div>`, async (m) => {
+    const body = {
+      name: m.querySelector('#f-name').value.trim(),
+      subdomain: m.querySelector('#f-sub').value.trim().toLowerCase(),
+      port: parseInt(m.querySelector('#f-port').value),
+      path: m.querySelector('#f-path').value.trim() || '/',
+      description: m.querySelector('#f-desc').value.trim(),
+      command: m.querySelector('#f-cmd').value.trim(),
+    };
+    if (!body.name || !body.subdomain || !body.port) { toast('Fill name, subdomain, port','err'); return; }
+    const r = await fetch('/api/apps', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error||'Failed','err'); return; }
+    closeModal(); toast('App added'); refreshApps();
+  });
 });
 
 async function refreshPorts() {
-  const r = await fetch('/api/ports'); const ports = await r.json();
-  const t = document.getElementById('ports-tbody'); t.innerHTML='';
+  const ports = await (await fetch('/api/ports')).json();
+  const t = document.getElementById('ports-tbody'); t.innerHTML = '';
+  if (!ports.length) { t.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-zinc-500 text-sm">No forwards yet</td></tr>'; return; }
   for (const p of ports) {
     const tr = document.createElement('tr'); tr.className='border-t border-zinc-800';
+    const statusColor = p.status === 'active' ? 'text-emerald-400' : 'text-zinc-500';
+    const statusDot = p.status === 'active' ? 'bg-emerald-400' : 'bg-zinc-600';
     tr.innerHTML = `
       <td class="p-3"><a href="https://${p.hostname}" target="_blank" class="text-blue-400 hover:underline">${p.hostname}</a></td>
       <td class="p-3 mono">${p.port}</td>
-      <td class="p-3 text-xs text-zinc-500">${new Date(p.createdAt).toLocaleDateString()}</td>
+      <td class="p-3 text-xs text-zinc-400">${p.protocol || 'http'}</td>
+      <td class="p-3"><span class="flex items-center gap-1.5 text-xs ${statusColor}"><span class="w-1.5 h-1.5 rounded-full ${statusDot}"></span>${p.status || '—'}</span></td>
+      <td class="p-3 text-xs text-zinc-500">${new Date(p.createdAt).toLocaleString()}</td>
       <td class="p-3 text-right"><button data-del="${p.id}" class="text-sm px-3 py-1.5 rounded text-red-400 hover:bg-red-500/10">Remove</button></td>`;
     t.appendChild(tr);
   }
-  t.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', async()=>{
-    await fetch('/api/ports/'+b.dataset.del,{method:'DELETE'});refreshPorts();
+  t.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
+    openModal('Remove forward', `<p class="text-sm text-zinc-400">Delete the DNS record + tunnel ingress rule?</p>`, async () => {
+      await fetch('/api/ports/'+b.dataset.del, { method:'DELETE' });
+      closeModal(); toast('Removed'); refreshPorts();
+    });
   }));
 }
 
-document.getElementById('new-port').addEventListener('click', async () => {
-  const subdomain = prompt('Subdomain (e.g. "myapp" for myapp.himansh.in)?');
-  if (!subdomain) return;
-  const port = prompt('Local port?'); if (!port) return;
-  const r = await fetch('/api/ports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subdomain,port})});
-  if(!r.ok){alert((await r.json()).error||'Failed');return;}
-  refreshPorts();
+document.getElementById('new-port').addEventListener('click', () => {
+  openModal('Forward Port', `
+    <div class="space-y-3">
+      <div><label class="text-xs text-zinc-500 mb-1 block">Subdomain</label><div class="flex items-center"><input id="f-sub" class="flex-1 px-3 py-2 rounded-l bg-zinc-800 border border-zinc-700 text-sm" placeholder="myapp"><span class="px-3 py-2 bg-zinc-800 border border-l-0 border-zinc-700 rounded-r text-xs text-zinc-400">.himansh.in</span></div></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-xs text-zinc-500 mb-1 block">Local port</label><input id="f-port" type="number" class="w-full px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-sm mono" placeholder="3000"></div>
+        <div><label class="text-xs text-zinc-500 mb-1 block">Protocol</label><select id="f-proto" class="w-full px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-sm"><option value="http">http</option><option value="https">https</option></select></div>
+      </div>
+    </div>`, async (m) => {
+    const body = {
+      subdomain: m.querySelector('#f-sub').value.trim().toLowerCase(),
+      port: parseInt(m.querySelector('#f-port').value),
+      protocol: m.querySelector('#f-proto').value,
+    };
+    if (!body.subdomain || !body.port) { toast('Fill both fields','err'); return; }
+    const r = await fetch('/api/ports', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error||'Failed','err'); return; }
+    closeModal(); toast('Port forwarded'); refreshPorts();
+  });
 });
 
 let currentPath = '';
 async function refreshFiles() {
   const r = await fetch('/api/files?path='+encodeURIComponent(currentPath));
   const d = await r.json();
-  if (d.error) { alert(d.error); return; }
-  document.getElementById('files-path').textContent = '/'+(d.path||'');
-  const t = document.getElementById('files-tbody'); t.innerHTML='';
+  if (d.error) { toast(d.error,'err'); return; }
+  document.getElementById('files-path').textContent = '/' + (d.path||'');
+  const t = document.getElementById('files-tbody'); t.innerHTML = '';
   for (const item of d.items) {
-    const tr = document.createElement('tr'); tr.className='border-t border-zinc-800 hover:bg-zinc-800/50 cursor-pointer';
-    tr.innerHTML = `<td class="p-2">${item.type==='directory'?'📁':'📄'} ${item.name}</td><td class="p-2 text-xs text-zinc-500 text-right">${item.type==='file'?fmtBytes(item.size):''}</td>`;
-    tr.addEventListener('click', () => {
+    const tr = document.createElement('tr'); tr.className='border-t border-zinc-800 hover:bg-zinc-800/50';
+    tr.innerHTML = `<td class="p-2 cursor-pointer" data-open>${item.type==='directory'?'📁':'📄'} ${item.name}</td><td class="p-2 text-xs text-zinc-500 text-right">${item.type==='file'?fmtBytes(item.size):''}</td><td class="p-2 text-right w-16"><button data-del class="text-xs text-red-400 hover:text-red-300">Delete</button></td>`;
+    tr.querySelector('[data-open]').addEventListener('click', () => {
       if (item.type==='directory') { currentPath = currentPath ? currentPath+'/'+item.name : item.name; refreshFiles(); }
-      else { window.open('/api/files?download=1&path='+encodeURIComponent((currentPath?currentPath+'/':'')+item.name)); }
+      else window.open('/api/files?download=1&path='+encodeURIComponent((currentPath?currentPath+'/':'')+item.name));
+    });
+    tr.querySelector('[data-del]').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Delete ${item.name}?`)) return;
+      await fetch('/api/files/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paths:[(currentPath?currentPath+'/':'')+item.name]})});
+      refreshFiles();
     });
     t.appendChild(tr);
   }
@@ -248,10 +402,13 @@ document.getElementById('files-up').addEventListener('click', () => {
   if (!currentPath) return;
   const parts = currentPath.split('/'); parts.pop(); currentPath = parts.join('/'); refreshFiles();
 });
-document.getElementById('files-mkdir').addEventListener('click', async () => {
-  const name = prompt('Folder name?'); if(!name)return;
-  await fetch('/api/files/mkdir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:currentPath+'/'+name})});
-  refreshFiles();
+document.getElementById('files-mkdir').addEventListener('click', () => {
+  openModal('New Folder', `<input id="f-name" class="w-full px-3 py-2 rounded bg-zinc-800 border border-zinc-700 text-sm" placeholder="folder name">`, async (m) => {
+    const name = m.querySelector('#f-name').value.trim();
+    if (!name) return;
+    await fetch('/api/files/mkdir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:(currentPath?currentPath+'/':'')+name})});
+    closeModal(); refreshFiles();
+  });
 });
 document.getElementById('files-upload').addEventListener('change', async (e) => {
   const fd = new FormData(); fd.append('path', currentPath);
@@ -260,13 +417,193 @@ document.getElementById('files-upload').addEventListener('change', async (e) => 
   refreshFiles();
 });
 
+// ---------- Terminal: multi-tab, server-side PTY, TTL ----------
+const TTL_OPTIONS = [
+  {v: 5*60*1000, l: '5 minutes'},
+  {v: 15*60*1000, l: '15 minutes'},
+  {v: 30*60*1000, l: '30 minutes (default)'},
+  {v: 60*60*1000, l: '1 hour'},
+  {v: 4*60*60*1000, l: '4 hours'},
+  {v: 24*60*60*1000, l: '24 hours'},
+  {v: 'unlimited', l: 'Unlimited'},
+];
+const termTabs = {};
+let activeSid = null;
+let termInitOnce = false;
+
+function wsURL(sid, shell) {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const q = new URLSearchParams();
+  if (sid) q.set('sessionId', sid);
+  if (shell) q.set('shell', shell);
+  return `${proto}//${location.host}/ws/terminal?${q}`;
+}
+
+function attachTermToDOM(sid) {
+  const views = document.getElementById('term-views');
+  let el = document.getElementById('term-view-'+sid);
+  const tab = termTabs[sid];
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'term-view-'+sid;
+    el.style.cssText = 'position:absolute;inset:0;padding:6px';
+    views.appendChild(el);
+    const t = new Terminal({ theme:{background:'#000000',foreground:'#fafafa',cursor:'#3b82f6'}, fontFamily:'JetBrains Mono, monospace', fontSize:13, cursorBlink:true, scrollback:10000 });
+    const fit = new FitAddon.FitAddon();
+    t.loadAddon(fit); t.loadAddon(new WebLinksAddon.WebLinksAddon());
+    t.open(el); setTimeout(() => { try { fit.fit(); } catch(_){} }, 50);
+    tab.term = t; tab.fit = fit;
+
+    const ws = new WebSocket(wsURL(sid, tab.shell));
+    tab.ws = ws;
+    ws.onopen = () => { try { ws.send(JSON.stringify({type:'resize', cols:t.cols, rows:t.rows})); } catch(_){} };
+    ws.onmessage = (ev) => {
+      try {
+        const m = JSON.parse(ev.data);
+        if (m.type==='output') t.write(m.data);
+        else if (m.type==='exit') t.write(`\r\n\x1b[33mProcess exited (code ${m.code})\x1b[0m\r\n`);
+        else if (m.type==='session') { tab.ttlMs = m.ttlMs; renderTermTabs(); }
+      } catch(_){}
+    };
+    ws.onclose = () => { t.write('\r\n\x1b[31mConnection closed\x1b[0m\r\n'); };
+    t.onData(d => { if (ws.readyState===1) ws.send(JSON.stringify({type:'input', data:d})); });
+    new ResizeObserver(() => { if (el.offsetWidth > 0) { try { fit.fit(); if (ws.readyState===1) ws.send(JSON.stringify({type:'resize', cols:t.cols, rows:t.rows})); } catch(_){} } }).observe(el);
+  }
+  document.querySelectorAll('#term-views > div').forEach(d => d.style.display = 'none');
+  el.style.display = 'block';
+  setTimeout(() => { try { tab.fit.fit(); } catch(_){} }, 20);
+}
+
+function renderTermTabs() {
+  const bar = document.getElementById('term-tabs'); bar.innerHTML = '';
+  for (const [sid, t] of Object.entries(termTabs)) {
+    const tab = document.createElement('div');
+    tab.className = 'term-tab' + (sid===activeSid ? ' active' : '');
+    tab.innerHTML = `<span>⌨</span><span>${t.title}</span><span class="px-1.5 rounded bg-zinc-800 text-[10px] mono" title="TTL">${fmtTTL(t.ttlMs)}</span><button class="gear text-zinc-500 hover:text-zinc-200" title="TTL">⚙</button><button class="close text-zinc-500 hover:text-red-400" title="Close">✕</button>`;
+    tab.addEventListener('click', (e) => {
+      if (e.target.classList.contains('gear')||e.target.classList.contains('close')) return;
+      activeSid = sid; attachTermToDOM(sid); renderTermTabs();
+    });
+    tab.querySelector('.gear').addEventListener('click', (e) => { e.stopPropagation(); openTTLMenu(sid); });
+    tab.querySelector('.close').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm('Close this terminal session? The server-side process will be killed.')) return;
+      await fetch('/api/terminal/sessions/'+sid, { method:'DELETE' });
+      try { termTabs[sid].ws.close(); } catch(_){}
+      document.getElementById('term-view-'+sid)?.remove();
+      delete termTabs[sid];
+      const rest = Object.keys(termTabs);
+      activeSid = rest[rest.length-1] || null;
+      if (activeSid) attachTermToDOM(activeSid);
+      renderTermTabs();
+    });
+    bar.appendChild(tab);
+  }
+  const plus = document.createElement('div');
+  plus.className = 'term-tab';
+  plus.innerHTML = `<button class="text-zinc-400 hover:text-zinc-100">+ New tab</button>`;
+  plus.addEventListener('click', async () => {
+    const r = await fetch('/api/terminal/sessions', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({shell:'bash', title:'bash'}) });
+    const d = await r.json();
+    termTabs[d.id] = { shell: d.shell, title: d.title, ttlMs: d.ttlMs };
+    activeSid = d.id; attachTermToDOM(d.id); renderTermTabs();
+  });
+  bar.appendChild(plus);
+}
+
+function openTTLMenu(sid) {
+  const html = `<p class="text-sm text-zinc-400 mb-3">When all tabs close, kill this session after:</p><div class="space-y-1">${TTL_OPTIONS.map(o => `<button data-v="${o.v}" class="w-full text-left px-3 py-2 rounded hover:bg-zinc-800 text-sm ${termTabs[sid].ttlMs===o.v?'bg-zinc-800 text-emerald-400':''}">${o.l}</button>`).join('')}</div>`;
+  openModal('Session TTL', html, () => closeModal());
+  document.getElementById('modal-ok').textContent = 'Close';
+  document.getElementById('modal-body').querySelectorAll('[data-v]').forEach(b => b.addEventListener('click', async () => {
+    const v = b.dataset.v==='unlimited' ? 'unlimited' : parseInt(b.dataset.v);
+    await fetch('/api/terminal/sessions/'+sid, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ttlMs: v}) });
+    termTabs[sid].ttlMs = v;
+    try { termTabs[sid].ws.send(JSON.stringify({type:'ttl', ttlMs: v})); } catch(_){}
+    closeModal(); renderTermTabs();
+  }));
+}
+
+async function refreshTerminal() {
+  if (termInitOnce) return;
+  termInitOnce = true;
+  try {
+    const list = await (await fetch('/api/terminal/sessions')).json();
+    for (const s of list) termTabs[s.id] = { shell: s.shell, title: s.title, ttlMs: s.ttlMs };
+    const first = Object.keys(termTabs)[0];
+    if (!first) {
+      const r = await fetch('/api/terminal/sessions', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({shell:'bash', title:'bash'}) });
+      const d = await r.json();
+      termTabs[d.id] = { shell:d.shell, title:d.title, ttlMs:d.ttlMs };
+      activeSid = d.id;
+    } else {
+      activeSid = first;
+    }
+    attachTermToDOM(activeSid);
+    renderTermTabs();
+  } catch(e) { console.error(e); }
+}
+
+async function refreshSettings() {
+  const pks = await (await fetch('/api/passkey/list')).json();
+  document.getElementById('pk-count').textContent = pks.length ? `${pks.length} registered` : 'none';
+  const list = document.getElementById('pk-list');
+  list.innerHTML = pks.length ? '' : '<p class="text-xs text-zinc-500">No passkeys yet.</p>';
+  for (const p of pks) {
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between p-2 bg-zinc-800 rounded text-sm';
+    row.innerHTML = `<div><div class="font-medium">${p.name}</div><div class="text-xs text-zinc-500">${p.created_at ? new Date(p.created_at).toLocaleDateString() : ''}</div></div><button data-del="${p.id}" class="px-2 py-1 text-xs text-red-400 hover:bg-red-500/10 rounded">Remove</button>`;
+    list.appendChild(row);
+  }
+  list.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('Remove this passkey?')) return;
+    await fetch('/api/passkey/delete',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:b.dataset.del})});
+    refreshSettings();
+  }));
+  const m = await (await fetch('/api/methods')).json();
+  const off = document.getElementById('totp-off'), setup = document.getElementById('totp-setup'), on = document.getElementById('totp-on'), badge = document.getElementById('totp-badge');
+  if (m.totp) { off.classList.add('hidden'); setup.classList.add('hidden'); on.classList.remove('hidden'); badge.textContent='Enabled'; badge.className='text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400'; }
+  else { off.classList.remove('hidden'); setup.classList.add('hidden'); on.classList.add('hidden'); badge.className='hidden'; }
+}
+
+document.getElementById('pk-add').addEventListener('click', async () => {
+  const name = document.getElementById('pk-name').value.trim() || `Passkey ${new Date().toLocaleDateString()}`;
+  try {
+    const opts = await (await fetch('/api/passkey/register-options')).json();
+    const cred = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON: opts });
+    const r = await fetch('/api/passkey/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential: cred, name})});
+    const d = await r.json();
+    if (!r.ok) { toast(d.error||'Failed','err'); return; }
+    document.getElementById('pk-name').value = ''; toast('Passkey registered'); refreshSettings();
+  } catch(e) { if (e.name !== 'NotAllowedError') toast('Failed: ' + e.message, 'err'); }
+});
+
+document.getElementById('totp-start').addEventListener('click', async () => {
+  const d = await (await fetch('/api/totp/setup',{method:'POST'})).json();
+  document.getElementById('totp-qr').src = d.qrCode;
+  document.getElementById('totp-secret').textContent = d.secret;
+  document.getElementById('totp-off').classList.add('hidden');
+  document.getElementById('totp-setup').classList.remove('hidden');
+});
+document.getElementById('totp-verify').addEventListener('click', async () => {
+  const code = document.getElementById('totp-code').value.trim();
+  const r = await fetch('/api/totp/enable',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+  const d = await r.json();
+  if (r.ok) { toast('TOTP enabled'); refreshSettings(); } else toast(d.error||'Invalid code','err');
+});
+document.getElementById('totp-disable').addEventListener('click', async () => {
+  if (!confirm('Disable TOTP?')) return;
+  await fetch('/api/totp/enable',{method:'DELETE'});
+  refreshSettings();
+});
+
 function loadTab(t) {
   if (t==='overview') refreshOverview();
   if (t==='apps') refreshApps();
   if (t==='ports') refreshPorts();
   if (t==='files') refreshFiles();
+  if (t==='settings') refreshSettings();
+  if (t==='terminal') refreshTerminal();
 }
-
-// Auto-refresh overview
 setInterval(() => { if (!document.querySelector('[data-tab=overview]').classList.contains('hidden')) refreshOverview(); }, 5000);
 </script></body></html>

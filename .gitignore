@@ -1,6 +1,8 @@
 node_modules/
 .next/
 .env.local
+pi-dash/.env
+pi-dash/data/
 data/auth.json
 data/port-forwards.json
 data/challenges.json
@@ -17,3 +19,9 @@ dash-*.txt
 bun.lockb
 *.tsbuildinfo
 next-env.d.ts
+
+# Linux env overlay (machine-local)
+.env.linux
+
+# SSH tunnel server runtime keys (host_key is private!)
+data/tunnel/

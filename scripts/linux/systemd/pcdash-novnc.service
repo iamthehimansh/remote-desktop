@@ -1,0 +1,14 @@
+[Unit]
+Description=PC Dashboard noVNC for virtual desktop (6080 -> 5902)
+After=pcdash-vnc.service
+Wants=pcdash-vnc.service
+
+[Service]
+Type=simple
+# Serves noVNC at http://localhost:6080/vnc.html, proxying to the TigerVNC desktop (:2).
+ExecStart=/usr/bin/websockify --web=/usr/share/novnc 6080 localhost:5902
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

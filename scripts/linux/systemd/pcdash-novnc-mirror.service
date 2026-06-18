@@ -1,0 +1,14 @@
+[Unit]
+Description=PC Dashboard noVNC for the screen mirror (6081 -> 5900)
+After=pcdash-vnc-mirror.service
+Wants=pcdash-vnc-mirror.service
+
+[Service]
+Type=simple
+# Serves noVNC at http://localhost:6081/vnc.html for the physical-screen mirror.
+ExecStart=/usr/bin/websockify --web=/usr/share/novnc 6081 localhost:5900
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

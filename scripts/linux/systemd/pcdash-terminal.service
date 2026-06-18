@@ -1,0 +1,14 @@
+[Unit]
+Description=PC Dashboard terminal server (node-pty WebSocket) :3006
+
+[Service]
+Type=simple
+WorkingDirectory=__REPO__
+Environment=NODE_ENV=production
+Environment=PATH=__NODEBIN__:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=__NODE__ --import tsx server/ws-server.ts
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

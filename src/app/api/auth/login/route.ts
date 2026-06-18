@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { verifyPassword, signToken, createSessionCookie } from "@/lib/auth";
 
+const PASSWORD_LOGIN_DISABLED = true;
 const attempts = new Map<string, { count: number; resetAt: number }>();
 
 export async function POST(request: Request) {
+  if (PASSWORD_LOGIN_DISABLED) {
+    return NextResponse.json(
+      { error: "Password login is disabled. Use passkey or TOTP." },
+      { status: 403 }
+    );
+  }
   const ip = request.headers.get("x-forwarded-for") || "unknown";
 
   // Rate limiting: 5 attempts per minute

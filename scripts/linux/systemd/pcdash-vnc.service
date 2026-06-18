@@ -1,0 +1,21 @@
+[Unit]
+Description=PC Dashboard TigerVNC virtual desktop (:2 -> 5902)
+
+[Service]
+Type=simple
+# :0 and :1 are taken by the GNOME Xwayland session, so use :2.
+# Unset the Wayland session env so the XFCE desktop stays INSIDE the VNC display
+# and never leaks windows/notifications onto the real screen.
+UnsetEnvironment=WAYLAND_DISPLAY XDG_SESSION_TYPE DISPLAY
+Environment=GDK_BACKEND=x11
+Environment=QT_QPA_PLATFORM=xcb
+ExecStartPre=-/usr/bin/tigervncserver -kill :2
+ExecStartPre=-/bin/sh -c 'rm -f /tmp/.X2-lock /tmp/.X11-unix/X2 "$HOME"/.config/tigervnc/*:2.pid "$HOME"/.vnc/*:2.pid; true'
+ExecStart=/usr/bin/tigervncserver :2 -fg -localhost yes -geometry 1920x1080 -depth 24 -name pcdash-desk
+ExecStop=-/usr/bin/tigervncserver -kill :2
+ExecStopPost=-/bin/sh -c 'rm -f /tmp/.X2-lock /tmp/.X11-unix/X2; true'
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

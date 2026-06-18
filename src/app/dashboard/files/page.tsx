@@ -62,6 +62,7 @@ function getFileIcon(ext: string | null) {
 export default function FilesPage() {
   const { toast } = useToast();
   const [currentPath, setCurrentPath] = useState("");
+  const [sep, setSep] = useState("\\"); // path separator — set per OS below
   const [parentPath, setParentPath] = useState<string | null>(null);
   const [items, setItems] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,16 +110,29 @@ export default function FilesPage() {
 
   useEffect(() => { fetchDir("drives"); }, [fetchDir]);
 
+  // Pick the OS path separator (Windows "\\" vs POSIX "/")
+  useEffect(() => {
+    fetch("/api/system/platform")
+      .then((r) => r.json())
+      .then((d) => setSep(d.platform === "win32" ? "\\" : "/"))
+      .catch(() => {});
+  }, []);
+
+  // Join a directory + child name without doubling the separator.
+  const joinPath = (base: string, name: string) =>
+    /[\\/]$/.test(base) ? `${base}${name}` : `${base}${sep}${name}`;
+
   const navigate = (name: string) => {
     if (currentPath === "drives") {
-      fetchDir(`${name}\\`);
+      // Drive/root values are already absolute ("C:\\" on Windows, "/" on Linux)
+      fetchDir(name);
     } else {
-      fetchDir(`${currentPath}\\${name}`);
+      fetchDir(joinPath(currentPath, name));
     }
   };
   const goUp = () => parentPath && fetchDir(parentPath === "drives" ? "drives" : parentPath);
 
-  const getFullPath = (name: string) => `${currentPath}\\${name}`;
+  const getFullPath = (name: string) => joinPath(currentPath, name);
 
   const handleUpload = async (files: FileList) => {
     const formData = new FormData();
@@ -162,7 +176,7 @@ export default function FilesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           oldPath: getFullPath(renameTarget),
-          newPath: `${currentPath}\\${renameName}`,
+          newPath: joinPath(currentPath, renameName),
         }),
       });
       if (res.ok) {
@@ -179,7 +193,7 @@ export default function FilesPage() {
       const res = await fetch("/api/files/mkdir", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: `${currentPath}\\${newFolderName}` }),
+        body: JSON.stringify({ path: joinPath(currentPath, newFolderName) }),
       });
       if (res.ok) {
         toast({ title: "Folder created" });
@@ -236,7 +250,12 @@ export default function FilesPage() {
   };
 
   const isDrives = currentPath === "drives";
-  const breadcrumbs = isDrives ? [] : currentPath.split("\\").filter(Boolean);
+  const breadcrumbs = isDrives ? [] : currentPath.split(/[\\/]/).filter(Boolean);
+  // Rebuild the absolute path for a breadcrumb at index i (POSIX needs a leading "/").
+  const crumbPath = (i: number) => {
+    const joined = breadcrumbs.slice(0, i + 1).join(sep);
+    return sep === "/" ? `/${joined}` : joined;
+  };
   const filtered = items.filter((i) => i.name.toLowerCase().includes(search.toLowerCase()));
 
   const toggleSelect = (name: string) => {
@@ -275,7 +294,7 @@ export default function FilesPage() {
             <span key={i} className="flex items-center shrink-0">
               <ChevronRight className="h-3 w-3 mx-0.5" />
               <button
-                onClick={() => fetchDir(breadcrumbs.slice(0, i + 1).join("\\"))}
+                onClick={() => fetchDir(crumbPath(i))}
                 className="hover:text-text-primary truncate max-w-[120px]"
               >
                 {seg}

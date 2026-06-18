@@ -4,6 +4,7 @@ import { renderLoginHtml } from "./login-ui";
 interface Env {
   JWT_SECRET: string;
   COOKIE_SUFFIX: string;
+  COOKIE_PREFIX?: string; // e.g. "__Secure-pcdash-app-" (default) or "__Secure-pidash-app-"
   DASHBOARD_URL: string;
   OAUTH_CLIENT_SECRETS: string; // JSON string: { <clientId>: <secret> }
   PCDASH_RL: KVNamespace;
@@ -26,8 +27,9 @@ function getAppId(host: string): string {
   return host.split(".")[0];
 }
 
-function cookieName(appId: string, suffix: string): string {
-  return `__Secure-pcdash-app-${appId}-${suffix}`;
+function cookieName(appId: string, suffix: string, prefix?: string): string {
+  const p = prefix || "__Secure-pcdash-app-";
+  return `${p}${appId}-${suffix}`;
 }
 
 async function rateLimit(env: Env, ip: string): Promise<boolean> {
@@ -81,12 +83,12 @@ export default {
 
     // ---- Cookie check ----
     const cookies = parseCookies(req.headers.get("cookie") || "");
-    const token = cookies[cookieName(appId, env.COOKIE_SUFFIX)];
+    const token = cookies[cookieName(appId, env.COOKIE_SUFFIX, env.COOKIE_PREFIX)];
     if (token) {
       const payload = await verifyJwt(token, env.JWT_SECRET);
       if (payload && payload.app === appId && payload.kind === "app") {
         // Authenticated — strip our cookie from outgoing request so the origin app never sees it
-        const forwardReq = stripOurCookie(req, cookieName(appId, env.COOKIE_SUFFIX));
+        const forwardReq = stripOurCookie(req, cookieName(appId, env.COOKIE_SUFFIX, env.COOKIE_PREFIX));
         return fetch(forwardReq);
       }
     }
@@ -159,7 +161,7 @@ async function handleCallbackPost(req: Request, env: Env, appId: string): Promis
     return new Response(JSON.stringify({ error: "bad_token" }), { status: 502 });
   }
 
-  const name = cookieName(appId, env.COOKIE_SUFFIX);
+  const name = cookieName(appId, env.COOKIE_SUFFIX, env.COOKIE_PREFIX);
   const cookie = `${name}=${data.access_token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${24 * 3600}`;
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,
@@ -232,7 +234,7 @@ function handlePopupCallback(url: URL): Response {
 }
 
 function handleLogout(appId: string, env: Env): Response {
-  const name = cookieName(appId, env.COOKIE_SUFFIX);
+  const name = cookieName(appId, env.COOKIE_SUFFIX, env.COOKIE_PREFIX);
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,
     headers: {

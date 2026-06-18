@@ -12,11 +12,17 @@ import { Plus, X, Terminal as TerminalIcon, ChevronDown, Clock, Settings, Loader
 
 const TerminalView = dynamic(() => import("@/components/terminal-view"), { ssr: false });
 
-const SHELLS = [
+const WIN_SHELLS = [
   { value: "powershell", label: "PowerShell" },
   { value: "powershell-admin", label: "PowerShell (Admin)" },
   { value: "cmd", label: "CMD" },
   { value: "wsl", label: "WSL" },
+];
+
+const UNIX_SHELLS = [
+  { value: "bash", label: "Bash" },
+  { value: "sh", label: "Shell (sh)" },
+  { value: "zsh", label: "Zsh" },
 ];
 
 const TTL_OPTIONS: Array<{ value: number | "unlimited"; label: string }> = [
@@ -45,6 +51,15 @@ export function PersistentTerminalHost() {
     refreshSessions, sessionsLoaded,
   } = usePersistentSessions();
   const [creating, setCreating] = useState(false);
+  const [SHELLS, setShells] = useState(WIN_SHELLS);
+
+  // Pick OS-appropriate shells (PowerShell/CMD on Windows, bash/sh/zsh on Linux)
+  useEffect(() => {
+    fetch("/api/system/platform")
+      .then((r) => r.json())
+      .then((d) => setShells(d.platform === "win32" ? WIN_SHELLS : UNIX_SHELLS))
+      .catch(() => {});
+  }, []);
 
   const visible = pathname === "/dashboard/terminal";
 

@@ -24,7 +24,9 @@ function getHeaders() {
 }
 
 function getConfigPath(): string {
-  return process.env.CLOUDFLARED_CONFIG_PATH || "C:\\Users\\pc\\.cloudflared\\config.yml";
+  if (process.env.CLOUDFLARED_CONFIG_PATH) return process.env.CLOUDFLARED_CONFIG_PATH;
+  if (process.platform === "win32") return "C:\\Users\\pc\\.cloudflared\\config.yml";
+  return `${process.env.HOME || "/root"}/.cloudflared/config.yml`;
 }
 
 export function readConfig(): TunnelConfig {

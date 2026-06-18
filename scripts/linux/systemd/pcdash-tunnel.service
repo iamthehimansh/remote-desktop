@@ -1,0 +1,16 @@
+[Unit]
+Description=PC Dashboard SSH tunnel server (serveo-style :2222/:8090/:8091)
+After=network-online.target pcdash-terminal.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__REPO__
+Environment=NODE_ENV=production
+Environment=PATH=__NODEBIN__:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=__NODE__ --import tsx server/tunnel-server.ts
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,16 @@
+[Unit]
+Description=PC Dashboard (Next.js custom server) :3005
+After=pcdash-terminal.service
+
+[Service]
+Type=simple
+WorkingDirectory=__REPO__
+Environment=NODE_ENV=production
+Environment=PORT=3005
+Environment=PATH=__NODEBIN__:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=__NODE__ --import tsx server/next-server.ts
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

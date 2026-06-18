@@ -5,22 +5,25 @@ import { verify } from "jsonwebtoken";
 import { parse as parseCookie } from "cookie";
 import { randomBytes } from "crypto";
 
-// Load .env.local manually (tsx/node doesn't auto-load it like Bun does)
-try {
-  const envPath = resolve(process.cwd(), ".env.local");
-  const envContent = readFileSync(envPath, "utf-8");
-  for (const line of envContent.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eqIdx = trimmed.indexOf("=");
-    if (eqIdx === -1) continue;
-    const key = trimmed.slice(0, eqIdx).trim();
-    const val = trimmed.slice(eqIdx + 1).trim().replace(/\\(.)/g, "$1");
-    if (!process.env[key]) {
-      process.env[key] = val;
+// Load env files manually (tsx/node doesn't auto-load them like Bun does).
+// On Linux, `.env.linux` is loaded FIRST so its values win (first-set wins),
+// overriding the Windows-specific paths/shells in `.env.local`. Windows ignores it.
+function loadEnvFile(path: string) {
+  try {
+    const envContent = readFileSync(path, "utf-8");
+    for (const line of envContent.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx === -1) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      const val = trimmed.slice(eqIdx + 1).trim().replace(/\\(.)/g, "$1");
+      if (!process.env[key]) process.env[key] = val;
     }
-  }
-} catch {}
+  } catch {}
+}
+if (process.platform === "linux") loadEnvFile(resolve(process.cwd(), ".env.linux"));
+loadEnvFile(resolve(process.cwd(), ".env.local"));
 
 // Prevent node-pty socket errors from crashing the process
 process.on("uncaughtException", (err: any) => {
@@ -41,12 +44,25 @@ if (!existsSync(SESSIONS_DIR)) mkdirSync(SESSIONS_DIR, { recursive: true });
 
 console.log(`JWT_SECRET loaded: ${JWT_SECRET ? "yes (" + JWT_SECRET.length + " chars)" : "NO - auth will fail!"}`);
 
-const SHELLS: Record<string, { command: string; args: string[] }> = {
-  powershell: { command: "powershell.exe", args: [] },
-  "powershell-admin": { command: "powershell.exe", args: ["-ExecutionPolicy", "Bypass"] },
-  cmd: { command: "cmd.exe", args: ["/K", "title Admin CMD"] },
-  wsl: { command: "wsl.exe", args: [] },
-};
+const IS_WIN = process.platform === "win32";
+
+// Shells differ per OS. On Linux the UI-supplied Windows shell names
+// (powershell/cmd/wsl) fall back to DEFAULT_SHELL via createSession().
+const SHELLS: Record<string, { command: string; args: string[] }> = IS_WIN
+  ? {
+      powershell: { command: "powershell.exe", args: [] },
+      "powershell-admin": { command: "powershell.exe", args: ["-ExecutionPolicy", "Bypass"] },
+      cmd: { command: "cmd.exe", args: ["/K", "title Admin CMD"] },
+      wsl: { command: "wsl.exe", args: [] },
+    }
+  : {
+      bash: { command: process.env.SSH_DEFAULT_SHELL || process.env.SHELL || "/bin/bash", args: ["-l"] },
+      sh: { command: "/bin/sh", args: [] },
+      zsh: { command: "/usr/bin/zsh", args: ["-l"] },
+    };
+
+const DEFAULT_SHELL = IS_WIN ? "powershell" : "bash";
+const HOME_DIR = process.env.USERPROFILE || process.env.HOME || require("os").homedir();
 
 // ---------- Session metadata persistence ----------
 interface SessionMeta {
@@ -93,23 +109,29 @@ const sessions = new Map<string, Session>();
 
 function logPathFor(id: string) { return join(SESSIONS_DIR, `${id}.log`); }
 
-const SHELL_TITLES: Record<string, string> = {
-  powershell: "PowerShell",
-  "powershell-admin": "PowerShell (Admin)",
-  cmd: "CMD",
-  wsl: "WSL",
-};
+const SHELL_TITLES: Record<string, string> = IS_WIN
+  ? {
+      powershell: "PowerShell",
+      "powershell-admin": "PowerShell (Admin)",
+      cmd: "CMD",
+      wsl: "WSL",
+    }
+  : {
+      bash: "Bash",
+      sh: "Shell",
+      zsh: "Zsh",
+    };
 
 function createSession(shell: string, sessionId?: string, title?: string): Session {
   const id = sessionId || randomBytes(8).toString("hex");
-  const shellConfig = SHELLS[shell] || SHELLS.powershell;
+  const shellConfig = SHELLS[shell] || SHELLS[DEFAULT_SHELL];
   const sessionTitle = title || SHELL_TITLES[shell] || shell;
 
   const ptyProcess = pty.spawn(shellConfig.command, shellConfig.args, {
     name: "xterm-256color",
     cols: 80,
     rows: 24,
-    cwd: process.env.USERPROFILE || "C:\\Users\\pc",
+    cwd: HOME_DIR,
     env: process.env,
     useConpty: true,
     conptyInheritCursor: false,
