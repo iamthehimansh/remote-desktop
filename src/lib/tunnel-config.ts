@@ -75,26 +75,36 @@ async function putRemoteConfig(ingress: IngressRule[]): Promise<void> {
   }
 }
 
+// A "fallback" rule is a wildcard (e.g. `*.himansh.in`, used by the SSH tunnel
+// router) or the bare catch-all (no hostname -> http_status:404). Specific
+// hostname rules (static services + port-forwards) must be inserted BEFORE these
+// so cloudflared (first-match-wins) routes them directly instead of letting the
+// wildcard swallow them.
+function isFallbackRule(r: IngressRule): boolean {
+  return !r.hostname || r.hostname.startsWith("*");
+}
+
+// Insert/replace a specific-hostname rule just before the first fallback rule.
+function upsertSpecificRule(ingress: IngressRule[], rule: IngressRule): IngressRule[] {
+  const cleaned = ingress.filter((r) => r.hostname !== rule.hostname);
+  const idx = cleaned.findIndex(isFallbackRule);
+  const insertAt = idx === -1 ? cleaned.length : idx;
+  cleaned.splice(insertAt, 0, rule);
+  return cleaned;
+}
+
 export async function addIngressRule(hostname: string, localPort: number, protocol: string): Promise<void> {
   const service = protocol === "ws"
     ? `ws://localhost:${localPort}`
     : `http://localhost:${localPort}`;
 
   const ingress = await getRemoteConfig();
-
-  // Insert before the catch-all rule (last entry)
-  const catchAll = ingress.pop()!;
-  ingress.push({ hostname, service });
-  ingress.push(catchAll);
-
-  await putRemoteConfig(ingress);
+  await putRemoteConfig(upsertSpecificRule(ingress, { hostname, service }));
 
   // Also save locally as backup
   try {
     const localConfig = readConfig();
-    const localCatchAll = localConfig.ingress.pop()!;
-    localConfig.ingress.push({ hostname, service });
-    localConfig.ingress.push(localCatchAll);
+    localConfig.ingress = upsertSpecificRule(localConfig.ingress, { hostname, service });
     writeFileSync(getConfigPath(), stringify(localConfig, { lineWidth: 0 }));
   } catch {}
 }
